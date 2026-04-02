@@ -200,7 +200,7 @@ async fn fetch_page(search: &str, sort: &str, page: u32) -> Result<Vec<Package>>
 }
 
 /// Sort a package list client-side by the HEX.pm sort param string.
-fn sort_packages(packages: &mut Vec<Package>, sort: &str) {
+fn sort_packages(packages: &mut [Package], sort: &str) {
     match sort {
         "recent_downloads" => packages.sort_by(|a, b| b.downloads_recent.cmp(&a.downloads_recent)),
         "downloads" => packages.sort_by(|a, b| b.downloads_all.cmp(&a.downloads_all)),
@@ -286,10 +286,8 @@ pub async fn fetch_packages(
             fetch_page(&api_search, sort, 5),
         );
         let mut all = vec![];
-        for result in [r1, r2, r3, r4, r5] {
-            if let Ok(pkgs) = result {
-                all.extend(pkgs);
-            }
+        for pkgs in [r1, r2, r3, r4, r5].into_iter().flatten() {
+            all.extend(pkgs);
         }
         (all, false)
     } else {

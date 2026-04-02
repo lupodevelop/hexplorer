@@ -26,10 +26,9 @@ fn run_status() -> Result<()> {
     let cache_dir = storage::cache_dir()?;
     println!("\n  {}/", cache_dir.display());
     println!(
-        "  ├── gh_stats.json    {:>4} entries  · {:>6}  · last write: {}",
+        "  ├── gh_stats.json    {:>4} entries  · {:>6}  · last write: –",
         s.gh_cache_entries,
         human_bytes(s.gh_cache_bytes),
-        "–",
     );
     println!(
         "  └── snapshots/       {:>4} files   · {:>6}",
@@ -88,8 +87,8 @@ fn run_prune(yes: bool) -> Result<()> {
                 .and_then(|s| s.to_str())
                 .unwrap_or("")
                 .to_string();
-            let date_part = name.splitn(2, '_').nth(1).unwrap_or("");
-            if let Some(date) = chrono::NaiveDate::parse_from_str(date_part, "%Y%m%d").ok() {
+            let date_part = name.split_once('_').map(|x| x.1).unwrap_or("");
+            if let Ok(date) = chrono::NaiveDate::parse_from_str(date_part, "%Y%m%d") {
                 if date < cutoff {
                     let bytes = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
                     to_remove.push((path, bytes));

@@ -232,7 +232,7 @@ pub fn prune(lang: Language, keep_weeks: u32) -> Result<Vec<PathBuf>> {
     for path in files {
         let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
         // Filename format: `{lang}_{YYYYMMDD}` — extract date portion after `_`.
-        let date_part = stem.splitn(2, '_').nth(1).unwrap_or("");
+        let date_part = stem.split_once('_').map(|x| x.1).unwrap_or("");
         if let Some(date) = parse_date(date_part) {
             if date < cutoff {
                 fs::remove_file(&path).with_context(|| format!("removing {:?}", path))?;
@@ -303,12 +303,12 @@ pub fn status() -> Result<StorageStatus> {
         let oldest = files.first().and_then(|p| {
             p.file_stem()?
                 .to_str()
-                .map(|s| s.splitn(2, '_').nth(1).unwrap_or("").to_string())
+                .map(|s| s.split_once('_').map(|x| x.1).unwrap_or("").to_string())
         });
         let newest = files.last().and_then(|p| {
             p.file_stem()?
                 .to_str()
-                .map(|s| s.splitn(2, '_').nth(1).unwrap_or("").to_string())
+                .map(|s| s.split_once('_').map(|x| x.1).unwrap_or("").to_string())
         });
 
         lang_statuses.push(LangStatus {

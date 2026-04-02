@@ -17,7 +17,7 @@ pub enum StorageSubcmd {
 
 // ── Top-level args ────────────────────────────────────────────────────────────
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Args {
     pub output: Option<OutputFormat>,
     pub language: Language,
@@ -27,19 +27,6 @@ pub struct Args {
     pub package: Option<String>,
     /// Present when the first positional arg is `storage`.
     pub storage_cmd: Option<StorageSubcmd>,
-}
-
-impl Default for Args {
-    fn default() -> Self {
-        Self {
-            output: None,
-            language: Language::default(),
-            search: None,
-            sort: Sort::default(),
-            package: None,
-            storage_cmd: None,
-        }
-    }
 }
 
 // ── Parser ────────────────────────────────────────────────────────────────────

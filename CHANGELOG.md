@@ -3,7 +3,17 @@
 All notable changes to hexplorer are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+
+## [0.1.1] — 2026-04-02
+
+### Fixed
+- `ptr_arg`: `sort_packages` now accepts `&mut [Package]` instead of `&mut Vec<Package>`
+- `manual_flatten`: replaced `if let Ok(pkgs)` in the loop with `.into_iter().flatten()`
+- `derivable_impls`: manual `impl Default for Args` replaced with `#[derive(Default)]`
+- `manual_split_once`: three occurrences of `splitn(2, '_').nth(1)` replaced with `split_once`
+- `print_literal`: en-dash `–` inlined in `println!` format string
+- `match_result_ok`: `if let Some(x) = y.ok()` replaced with `if let Ok(x) = y`
+
 
 ## [0.1.0] — 2026-03-22
 
