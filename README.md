@@ -30,7 +30,7 @@ This installs the binaries under `$HOME/.cargo/bin` and is the easiest way to ge
 If you are developing locally or want the latest commit:
 
 ```sh
-git clone https://github.com/<user>/hexplorer
+git clone https://github.com/lupodevelop/hexplorer
 cd hexplorer
 cargo install --path .
 ```
@@ -38,13 +38,13 @@ cargo install --path .
 #### From GitHub directly
 
 ```sh
-cargo install --git https://github.com/<user>/hexplorer --branch main
+cargo install --git https://github.com/lupodevelop/hexplorer --branch main
 ```
 
 ### Build from source
 
 ```sh
-git clone https://github.com/<user>/hexplorer
+git clone https://github.com/lupodevelop/hexplorer
 cd hexplorer
 cargo build --release
 # binary at ./target/release/hexplorer
