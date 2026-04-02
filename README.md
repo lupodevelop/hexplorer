@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/lupodevelop/hexplorer/main/assets/logo.png" alt="hexplorer logo" width="256" />
+  <img src="https://raw.githubusercontent.com/lupodevelop/hexplorer/e705653c020fc332c5b8c5f45fc0a6b034e15330/assets/logo.png" alt="hexplorer logo" width="256" />
 </p>
 
 
@@ -10,7 +10,7 @@
 Terminal UI for browsing [HEX.pm](https://hex.pm) the package registry for the BEAM ecosystem (Gleam, Elixir, Erlang).
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/lupodevelop/hexplorer/main/assets/img/terminal.png" alt="hexplorer TUI screenshot" width="640" />
+  <img src="https://raw.githubusercontent.com/lupodevelop/hexplorer/e705653c020fc332c5b8c5f45fc0a6b034e15330/assets/img/terminal.png" alt="hexplorer TUI screenshot" width="640" />
 </p>
 
 ## Install
