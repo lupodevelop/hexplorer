@@ -4,6 +4,11 @@ All notable changes to hexplorer are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+## [0.1.2] — 2026-04-02
+
+### Changed
+- README URLs and installation examples updated to use `lupodevelop` and current commit-based raw asset paths.
+
 ## [0.1.1] — 2026-04-02
 
 ### Fixed
