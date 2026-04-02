@@ -1,7 +1,14 @@
 [package]
-name    = "hexplorer"
+name = "hexplorer"
 version = "0.1.0"
 edition = "2021"
+authors = ["lupodevelop <you@example.com>"]
+description = "Terminal UI for browsing HEX.pm package registry for the BEAM ecosystem"
+license = "MIT"
+repository = "https://github.com/lupodevelop/hexplorer"
+documentation = "https://docs.rs/hexplorer"
+readme = "README.md"
+keywords = ["hex", "beam", "gleam", "elixir", "erlang", "tui", "cli"]
 
 [[bin]]
 name = "hexplorer"
