@@ -223,17 +223,107 @@ pub enum SettingRow {
     KeepWeeks,
     Compress,
     ClearGhCache,
+    ColorScheme,
 }
 
 impl SettingRow {
     pub fn all() -> &'static [Self] {
         &[
             Self::GithubToken,
+            Self::ColorScheme,
             Self::KeepWeeks,
             Self::Compress,
             Self::ClearGhCache,
         ]
     }
+}
+
+// ── ColorScheme & Palette ─────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum ColorScheme {
+    #[default]
+    Default,
+    Dracula,
+    Nord,
+    Gruvbox,
+}
+
+impl ColorScheme {
+    pub fn label(self) -> &'static str {
+        match self {
+            ColorScheme::Default => "Default",
+            ColorScheme::Dracula => "Dracula",
+            ColorScheme::Nord => "Nord",
+            ColorScheme::Gruvbox => "Gruvbox",
+        }
+    }
+
+    pub fn cycle(self) -> Self {
+        match self {
+            ColorScheme::Default => ColorScheme::Dracula,
+            ColorScheme::Dracula => ColorScheme::Nord,
+            ColorScheme::Nord => ColorScheme::Gruvbox,
+            ColorScheme::Gruvbox => ColorScheme::Default,
+        }
+    }
+
+    pub fn cycle_back(self) -> Self {
+        match self {
+            ColorScheme::Default => ColorScheme::Gruvbox,
+            ColorScheme::Gruvbox => ColorScheme::Nord,
+            ColorScheme::Nord => ColorScheme::Dracula,
+            ColorScheme::Dracula => ColorScheme::Default,
+        }
+    }
+
+    pub fn palette(self) -> Palette {
+        match self {
+            ColorScheme::Default => Palette {
+                yellow: Color::Rgb(255, 212, 59),
+                green: Color::Rgb(80, 250, 123),
+                dim: Color::Rgb(90, 88, 110),
+                white: Color::White,
+                bg_bar: Color::Rgb(16, 10, 26),
+                bg_sel: Color::Rgb(38, 14, 52),
+            },
+            // Dracula: high-contrast bright colors on near-black background
+            ColorScheme::Dracula => Palette {
+                yellow: Color::Rgb(241, 250, 140), // #f1fa8c
+                green: Color::Rgb(80, 250, 123),   // #50fa7b
+                dim: Color::Rgb(98, 114, 164),     // #6272a4 comment
+                white: Color::Rgb(248, 248, 242),  // #f8f8f2 foreground
+                bg_bar: Color::Rgb(25, 26, 33),    // #191a21 darker bg
+                bg_sel: Color::Rgb(68, 71, 90),    // #44475a current line
+            },
+            ColorScheme::Nord => Palette {
+                yellow: Color::Rgb(235, 203, 139),
+                green: Color::Rgb(163, 190, 140),
+                dim: Color::Rgb(76, 86, 106),
+                white: Color::Rgb(236, 239, 244),
+                bg_bar: Color::Rgb(29, 33, 44),
+                bg_sel: Color::Rgb(46, 52, 64),
+            },
+            ColorScheme::Gruvbox => Palette {
+                yellow: Color::Rgb(250, 189, 47),
+                green: Color::Rgb(184, 187, 38),
+                dim: Color::Rgb(146, 131, 116),
+                white: Color::Rgb(235, 219, 178),
+                bg_bar: Color::Rgb(29, 32, 33),
+                bg_sel: Color::Rgb(50, 48, 47),
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Palette {
+    pub yellow: Color,
+    pub green: Color,
+    pub dim: Color,
+    pub white: Color,
+    pub bg_bar: Color,
+    pub bg_sel: Color,
 }
 
 // ── OutputFormat ──────────────────────────────────────────────────────────────
