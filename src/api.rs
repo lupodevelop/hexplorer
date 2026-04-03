@@ -22,6 +22,8 @@ struct HexRaw {
     links: Option<HashMap<String, String>>,
     docs_html_url: Option<String>,
     html_url: Option<String>,
+    /// Populated only by the single-package endpoint, not the listing.
+    releases: Option<Vec<RawRelease>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -36,6 +38,11 @@ struct RawMeta {
     licenses: Option<Vec<String>>,
     links: Option<HashMap<String, String>>,
     build_tools: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawRelease {
+    version: String,
 }
 
 // ── Public view model (TUI-flat) ──────────────────────────────────────────────
@@ -59,6 +66,9 @@ pub struct Package {
     pub language: Language,
     /// Raw primary build tool string from HEX.pm metadata.
     pub build_tool: String,
+    /// All published versions, newest first.
+    /// Empty when the package came from a listing response (populated only via `fetch_package`).
+    pub versions: Vec<String>,
 }
 
 // ── GitHub types ──────────────────────────────────────────────────────────────
@@ -155,6 +165,12 @@ fn into_package(r: HexRaw) -> Package {
         docs_url,
         language,
         build_tool,
+        versions: r
+            .releases
+            .unwrap_or_default()
+            .into_iter()
+            .map(|r| r.version)
+            .collect(),
     }
 }
 
