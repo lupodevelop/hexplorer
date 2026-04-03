@@ -10,7 +10,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `?` settings screen now includes a `default_language` row and `color_scheme` row with `←`/`→` to cycle values.
 - `Ctrl+W` / `Ctrl+Backspace` now delete the previous word in search mode and in the GitHub token input field.
 - Detail view: `Tab` / `Shift+Tab` cycle a cursor through the available links (docs, hex.pm, repo). `Enter` opens the selected link in the system browser.
+- Detail view: `r` force-refreshes GitHub stats and version history for the currently selected package only (evicts its entry from both the GH stats cache and the in-memory listing cache).
 - Settings screen: new `link_style` row (under Appearance) cycles between `Cursor ▶` (vim-like marker) and `Block ■` (solid accent-color background on the selected link row). Setting persists to `meta.json`.
+- Header now shows a colored cache-status badge: `● live` (green) after a fresh network fetch, `◎ cached` (yellow) when results are served from the in-memory session cache, and `⟳ fetching…` (dim) while a request is in flight.
+- In-memory session cache (`pkg_cache`) stores listing results keyed by `(query, sort, language, page)` — repeated navigation to the same view is instant and avoids redundant HTTP requests.
 
 ### Changed
 - `hexplorer` now loads `default_language` from `~/.cache/hexplorer/meta.json` when `--lang` is not explicitly passed.

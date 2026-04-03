@@ -106,6 +106,7 @@ hexplorer storage config github_token=           # remove stored token
 | `PgUp/Dn` | Fast scroll |
 | `Tab` / `Shift+Tab` | Cycle through available links (docs, hex.pm, repo) |
 | `Enter` | Open selected link in system browser |
+| `r` | Force-refresh GitHub stats and version history for current package |
 
 ## GitHub stats
 
