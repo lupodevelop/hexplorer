@@ -71,6 +71,7 @@ hexplorer storage prune --yes          # skip confirmation prompt
 hexplorer storage clear                # wipe all cached data (requires typing "yes")
 hexplorer storage config                          # show current config
 hexplorer storage config keep_weeks=4             # set snapshot retention
+hexplorer storage config default_language=elixir  # set startup language (gleam/elixir/erlang/all)
 hexplorer storage config github_token=ghp_...    # store GitHub token persistently
 hexplorer storage config github_token=           # remove stored token
 ```

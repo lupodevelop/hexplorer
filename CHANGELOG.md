@@ -4,6 +4,19 @@ All notable changes to hexplorer are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+<<<<<<< Updated upstream
+=======
+## [0.1.3] — 2026-04-03
+
+### Added
+- `hexplorer storage config default_language=<gleam|elixir|erlang|all>` to persist startup language.
+- `?` settings screen now includes a `default_language` row and `color_scheme` row with `←`/`→` to cycle values.
+
+### Changed
+- `hexplorer` now loads `default_language` from `~/.cache/hexplorer/meta.json` when `--lang` is not explicitly passed.
+- UI now persistently loads selected color scheme from storage meta.
+
+>>>>>>> Stashed changes
 ## [0.1.2] — 2026-04-02
 
 ### Changed
