@@ -11,7 +11,7 @@ use crate::{
     cache::{self, CacheMap, CachedEntry},
     favorites,
     storage::{self, StorageConfig},
-    types::{ColorScheme, Language, SettingRow, Sort, View},
+    types::{ColorScheme, Language, LinkStyle, SettingRow, Sort, View},
 };
 
 // ── GitHub fetch state ────────────────────────────────────────────────────────
@@ -74,6 +74,8 @@ pub struct App {
     pub favorites_mode: bool,
     /// Active color scheme — loaded from config at startup, changed live via settings.
     pub color_scheme: ColorScheme,
+    /// Active link highlight style — loaded from config at startup, changed live via settings.
+    pub link_style: LinkStyle,
     // ── Settings screen state ─────────────────────────────────────────────────
     /// Index into `SettingRow::all()` for the settings cursor.
     pub settings_cursor: usize,
@@ -85,6 +87,9 @@ pub struct App {
     pub settings_config: StorageConfig,
     /// Current stored token (loaded when opening settings, for masked display).
     pub settings_token: Option<String>,
+    /// Index of the currently highlighted link in the detail view (tab-navigated).
+    /// Indexes into the ordered list [docs_url, hex_url, repo_url] filtered to Some values.
+    pub link_cursor: Option<usize>,
     tx: Sender<Msg>,
     /// Monotonically-increasing counter; each `load()` call increments it.
     /// `Msg::Loaded` carries the generation it was spawned with — results from
@@ -113,13 +118,18 @@ impl App {
             favorites: favorites::load(),
             favorites_mode: false,
             color_scheme: storage::load_meta()
+                .as_ref()
                 .map(|m| m.config.color_scheme)
+                .unwrap_or_default(),
+            link_style: storage::load_meta()
+                .map(|m| m.config.link_style)
                 .unwrap_or_default(),
             settings_cursor: 0,
             settings_editing: false,
             settings_input: String::new(),
             settings_config: StorageConfig::default(),
             settings_token: None,
+            link_cursor: None,
             tx,
             fetch_gen: 0,
         }
@@ -318,6 +328,7 @@ impl App {
                 }
                 SettingRow::KeepWeeks => {}
                 SettingRow::ColorScheme => {}
+                SettingRow::LinkStyle => {}
                 SettingRow::DefaultLanguage => {}
             },
 
@@ -345,6 +356,19 @@ impl App {
                     (cur + 1).min(PRESETS.len() - 1)
                 };
                 self.settings_config.keep_weeks = PRESETS[next];
+                self.persist_settings_config();
+            }
+
+            // ← / → cycle link style.
+            KeyCode::Left | KeyCode::Right
+                if rows.get(self.settings_cursor) == Some(&SettingRow::LinkStyle) =>
+            {
+                self.settings_config.link_style = if key.code == KeyCode::Left {
+                    self.settings_config.link_style.cycle_back()
+                } else {
+                    self.settings_config.link_style.cycle()
+                };
+                self.link_style = self.settings_config.link_style;
                 self.persist_settings_config();
             }
 
@@ -582,6 +606,7 @@ impl App {
                 if !self.packages.is_empty() {
                     self.view = View::Detail;
                     self.scroll = 0;
+                    self.link_cursor = None;
                     self.ensure_gh_stats();
                 }
             }
@@ -603,6 +628,7 @@ impl App {
         match key.code {
             KeyCode::Char('q') | KeyCode::Esc | KeyCode::Backspace => {
                 self.view = View::List;
+                self.link_cursor = None;
             }
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => return true,
             KeyCode::Down | KeyCode::Char('j') => {
@@ -616,6 +642,54 @@ impl App {
             }
             KeyCode::PageUp => {
                 self.scroll = self.scroll.saturating_sub(10);
+            }
+            KeyCode::Tab => {
+                let count = self
+                    .selected()
+                    .map(|pkg| {
+                        [&pkg.docs_url, &pkg.hex_url, &pkg.repo_url]
+                            .iter()
+                            .filter(|u| u.is_some())
+                            .count()
+                    })
+                    .unwrap_or(0);
+                if count > 0 {
+                    self.link_cursor = Some(match self.link_cursor {
+                        None => 0,
+                        Some(i) => (i + 1) % count,
+                    });
+                }
+            }
+            KeyCode::BackTab => {
+                let count = self
+                    .selected()
+                    .map(|pkg| {
+                        [&pkg.docs_url, &pkg.hex_url, &pkg.repo_url]
+                            .iter()
+                            .filter(|u| u.is_some())
+                            .count()
+                    })
+                    .unwrap_or(0);
+                if count > 0 {
+                    self.link_cursor = Some(match self.link_cursor {
+                        None | Some(0) => count - 1,
+                        Some(i) => i - 1,
+                    });
+                }
+            }
+            KeyCode::Enter => {
+                if let Some(idx) = self.link_cursor {
+                    let url = self.selected().and_then(|pkg| {
+                        [&pkg.docs_url, &pkg.hex_url, &pkg.repo_url]
+                            .iter()
+                            .filter_map(|u| u.as_deref())
+                            .nth(idx)
+                            .map(str::to_string)
+                    });
+                    if let Some(url) = url {
+                        let _ = open::that(url);
+                    }
+                }
             }
             _ => {}
         }
