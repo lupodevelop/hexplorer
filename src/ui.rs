@@ -8,26 +8,23 @@ use ratatui::{
 use crate::{
     app::{App, GhState},
     fmt,
-    types::{Language, SettingRow, View},
+    types::{Language, Palette, SettingRow, View},
 };
 
-// ── Fixed palette (non-language-specific) ─────────────────────────────────────
+// ── Settings view accent (fixed BEAM cyan — not subject to theming) ───────────
 
-const YELLOW: Color = Color::Rgb(255, 212, 59);
-const GREEN: Color = Color::Rgb(80, 250, 123);
-const DIM: Color = Color::Rgb(90, 88, 110);
-const WHITE: Color = Color::White;
-const BG_BAR: Color = Color::Rgb(16, 10, 26);
-const BG_SEL: Color = Color::Rgb(38, 14, 52);
+const SETTINGS_ACCENT: Color = Color::Rgb(97, 218, 251);
 
-// ── Favorites accent ──────────────────────────────────────────────────────────
+// ── Palette helper ─────────────────────────────────────────────────────────────
 
-const FAVORITES_ACCENT: Color = Color::Rgb(255, 212, 59); // same gold as the ★ star
+fn pal(app: &App) -> Palette {
+    app.color_scheme.palette()
+}
 
-/// Returns the UI accent colour: gold when in favorites mode, language colour otherwise.
+/// Returns the UI accent colour: palette yellow in favorites mode, language colour otherwise.
 fn accent(app: &App) -> Color {
     if app.favorites_mode {
-        FAVORITES_ACCENT
+        pal(app).yellow
     } else {
         app.language.accent()
     }
@@ -62,6 +59,7 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
     ])
     .areas(area);
 
+    let p = pal(app);
     // ── Left: logo ────────────────────────────────────────────────────────────
     let accent = accent(app);
     let count = if app.loading {
@@ -77,7 +75,7 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
         .border_style(Style::new().fg(accent))
         .title(Line::from(vec![
             Span::styled(" ✦ ", Style::new().fg(accent)),
-            Span::styled("hexplorer", Style::new().fg(WHITE).bold()),
+            Span::styled("hexplorer", Style::new().fg(p.white).bold()),
         ]))
         .title_bottom(Span::styled(count, Style::new().fg(accent)));
     f.render_widget(logo_block, left);
@@ -87,20 +85,23 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
 
     // ── Right: search + sort ──────────────────────────────────────────────────
     let (search_txt, search_sty) = if app.input_mode {
-        (format!("  /{}_", app.input), Style::new().fg(YELLOW).bold())
+        (
+            format!("  /{}_", app.input),
+            Style::new().fg(p.yellow).bold(),
+        )
     } else if app.input.is_empty() {
         (
             "  press / to search…".to_string(),
-            Style::new().fg(DIM).italic(),
+            Style::new().fg(p.dim).italic(),
         )
     } else {
-        (format!("  /{}", app.input), Style::new().fg(WHITE))
+        (format!("  /{}", app.input), Style::new().fg(p.white))
     };
 
     let search_block = Block::bordered()
         .border_type(BorderType::Rounded)
         .border_style(if app.input_mode {
-            Style::new().fg(YELLOW)
+            Style::new().fg(p.yellow)
         } else {
             Style::new().fg(accent)
         });
@@ -108,15 +109,16 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
     let lines = vec![
         Line::from(Span::styled(search_txt, search_sty)),
         Line::from(vec![
-            Span::styled("  sort: ", Style::new().fg(DIM)),
+            Span::styled("  sort: ", Style::new().fg(p.dim)),
             Span::styled(app.sort.label(), Style::new().fg(accent)),
-            Span::styled("  [tab]", Style::new().fg(DIM).italic()),
+            Span::styled("  [tab]", Style::new().fg(p.dim).italic()),
         ]),
     ];
     f.render_widget(Paragraph::new(lines).block(search_block), right);
 }
 
 fn draw_tab_bar(f: &mut Frame, app: &App, area: Rect) {
+    let p = pal(app);
     let bar_accent = accent(app);
 
     let block = Block::bordered()
@@ -132,11 +134,11 @@ fn draw_tab_bar(f: &mut Frame, app: &App, area: Rect) {
         // Favorites mode: show a ★ favorites tab as active, language tabs dimmed.
         tab_spans.push(Span::styled(
             "[★ favorites]",
-            Style::new().fg(FAVORITES_ACCENT).bold().underlined(),
+            Style::new().fg(p.yellow).bold().underlined(),
         ));
         tab_spans.push(Span::raw("  "));
         for &lang in Language::all() {
-            tab_spans.push(Span::styled(lang.label(), Style::new().fg(DIM)));
+            tab_spans.push(Span::styled(lang.label(), Style::new().fg(p.dim)));
             tab_spans.push(Span::raw("  "));
         }
     } else {
@@ -148,7 +150,7 @@ fn draw_tab_bar(f: &mut Frame, app: &App, area: Rect) {
                     Style::new().fg(lang.accent()).bold().underlined(),
                 ));
             } else {
-                tab_spans.push(Span::styled(lang.label(), Style::new().fg(DIM)));
+                tab_spans.push(Span::styled(lang.label(), Style::new().fg(p.dim)));
             }
             tab_spans.push(Span::raw("  "));
         }
@@ -156,7 +158,7 @@ fn draw_tab_bar(f: &mut Frame, app: &App, area: Rect) {
 
     let hint = Line::from(Span::styled(
         "  l / L  cycle language",
-        Style::new().fg(DIM).italic(),
+        Style::new().fg(p.dim).italic(),
     ));
 
     f.render_widget(Paragraph::new(vec![Line::from(tab_spans), hint]), inner);
@@ -173,6 +175,7 @@ fn draw_list_view(f: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_package_list(f: &mut Frame, app: &App, area: Rect) {
+    let p = pal(app);
     let accent = accent(app);
     let title = if app.favorites_mode {
         format!(" ★ favorites ({}) ", app.packages.len())
@@ -200,14 +203,14 @@ fn draw_package_list(f: &mut Frame, app: &App, area: Rect) {
     }
     if app.loading {
         f.render_widget(
-            Paragraph::new("\n  ⟳  fetching from hex.pm…").style(Style::new().fg(DIM).italic()),
+            Paragraph::new("\n  ⟳  fetching from hex.pm…").style(Style::new().fg(p.dim).italic()),
             inner,
         );
         return;
     }
     if app.packages.is_empty() {
         f.render_widget(
-            Paragraph::new("\n  no packages found").style(Style::new().fg(DIM)),
+            Paragraph::new("\n  no packages found").style(Style::new().fg(p.dim)),
             inner,
         );
         return;
@@ -218,12 +221,12 @@ fn draw_package_list(f: &mut Frame, app: &App, area: Rect) {
     let items: Vec<ListItem> = app
         .packages
         .iter()
-        .map(|p| {
+        .map(|pkg| {
             let mut spans = vec![];
 
             // Star indicator for favorited packages.
-            if app.favorites.contains_key(&p.name) {
-                spans.push(Span::styled("★ ", Style::new().fg(YELLOW)));
+            if app.favorites.contains_key(&pkg.name) {
+                spans.push(Span::styled("★ ", Style::new().fg(p.yellow)));
             } else {
                 spans.push(Span::raw("  "));
             }
@@ -231,18 +234,18 @@ fn draw_package_list(f: &mut Frame, app: &App, area: Rect) {
             // Language badge in All-BEAM mode or favorites mode.
             if show_badge {
                 spans.push(Span::styled(
-                    format!("[{}] ", p.language.badge()),
-                    Style::new().fg(p.language.accent()),
+                    format!("[{}] ", pkg.language.badge()),
+                    Style::new().fg(pkg.language.accent()),
                 ));
             }
 
-            spans.push(Span::styled(p.name.clone(), Style::new().fg(WHITE)));
+            spans.push(Span::styled(pkg.name.clone(), Style::new().fg(p.white)));
             spans.push(Span::styled(
-                format!("  v{}", p.version),
-                Style::new().fg(DIM),
+                format!("  v{}", pkg.version),
+                Style::new().fg(p.dim),
             ));
             spans.push(Span::styled(
-                format!("  {}⬇", fmt::dl_short(p.downloads_recent)),
+                format!("  {}⬇", fmt::dl_short(pkg.downloads_recent)),
                 Style::new().fg(accent),
             ));
 
@@ -252,18 +255,19 @@ fn draw_package_list(f: &mut Frame, app: &App, area: Rect) {
 
     let list = List::new(items)
         .highlight_symbol("▶ ")
-        .highlight_style(Style::new().bg(BG_SEL).fg(accent).bold());
+        .highlight_style(Style::new().bg(p.bg_sel).fg(accent).bold());
 
     let mut state = app.list_state.clone();
     f.render_stateful_widget(list, inner, &mut state);
 }
 
 fn draw_preview(f: &mut Frame, app: &App, area: Rect) {
+    let p = pal(app);
     let accent = accent(app);
 
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
-        .border_style(Style::new().fg(DIM));
+        .border_style(Style::new().fg(p.dim));
 
     let inner = block.inner(area);
     f.render_widget(block, area);
@@ -283,14 +287,14 @@ fn draw_preview(f: &mut Frame, app: &App, area: Rect) {
             Span::styled(pkg.name.clone(), Style::new().fg(name_color).bold()),
             Span::styled(format!("  v{}", pkg.version), Style::new().fg(accent)),
         ]),
-        Line::from(Span::styled("─".repeat(w.min(44)), Style::new().fg(DIM))),
+        Line::from(Span::styled("─".repeat(w.min(44)), Style::new().fg(p.dim))),
     ];
 
     if !pkg.description.is_empty() {
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
             pkg.description.clone(),
-            Style::new().fg(WHITE),
+            Style::new().fg(p.white),
         )));
     }
 
@@ -299,42 +303,42 @@ fn draw_preview(f: &mut Frame, app: &App, area: Rect) {
         Span::styled("⬇ ", Style::new().fg(accent)),
         Span::styled(
             fmt::dl_full(pkg.downloads_all),
-            Style::new().fg(WHITE).bold(),
+            Style::new().fg(p.white).bold(),
         ),
-        Span::styled("  total", Style::new().fg(DIM)),
+        Span::styled("  total", Style::new().fg(p.dim)),
     ]));
     lines.push(Line::from(vec![
         Span::styled("⬇ ", Style::new().fg(accent)),
-        Span::styled(fmt::dl_full(pkg.downloads_recent), Style::new().fg(WHITE)),
-        Span::styled("  recent", Style::new().fg(DIM)),
+        Span::styled(fmt::dl_full(pkg.downloads_recent), Style::new().fg(p.white)),
+        Span::styled("  recent", Style::new().fg(p.dim)),
     ]));
 
     // Cached GitHub stats (no live fetch in list view)
     if let Some(entry) = app.preview_gh() {
         lines.push(Line::from(vec![
-            Span::styled("★ ", Style::new().fg(YELLOW)),
-            Span::styled(entry.stars.to_string(), Style::new().fg(WHITE).bold()),
+            Span::styled("★ ", Style::new().fg(p.yellow)),
+            Span::styled(entry.stars.to_string(), Style::new().fg(p.white).bold()),
             Span::styled("  ⑂ ", Style::new().fg(accent)),
-            Span::styled(entry.forks.to_string(), Style::new().fg(WHITE)),
+            Span::styled(entry.forks.to_string(), Style::new().fg(p.white)),
             Span::styled(
                 format!("  ({})", entry.age_label()),
-                Style::new().fg(DIM).italic(),
+                Style::new().fg(p.dim).italic(),
             ),
         ]));
     }
 
     lines.push(Line::from(""));
     lines.push(Line::from(vec![
-        Span::styled("updated   ", Style::new().fg(DIM)),
+        Span::styled("updated   ", Style::new().fg(p.dim)),
         Span::styled(
             fmt::date(&pkg.updated_at).to_string(),
-            Style::new().fg(WHITE),
+            Style::new().fg(p.white),
         ),
     ]));
     if !pkg.licenses.is_empty() {
         lines.push(Line::from(vec![
-            Span::styled("license   ", Style::new().fg(DIM)),
-            Span::styled(pkg.licenses.join(", "), Style::new().fg(WHITE)),
+            Span::styled("license   ", Style::new().fg(p.dim)),
+            Span::styled(pkg.licenses.join(", "), Style::new().fg(p.white)),
         ]));
     }
     if let Some(docs) = &pkg.docs_url {
@@ -360,7 +364,7 @@ fn draw_preview(f: &mut Frame, app: &App, area: Rect) {
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
         "  ↵ Enter for full detail",
-        Style::new().fg(DIM).italic(),
+        Style::new().fg(p.dim).italic(),
     )));
 
     f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
@@ -369,11 +373,12 @@ fn draw_preview(f: &mut Frame, app: &App, area: Rect) {
 // ── Detail view ───────────────────────────────────────────────────────────────
 
 fn draw_detail_view(f: &mut Frame, app: &App, area: Rect) {
+    let p = pal(app);
     let accent = if app.favorites_mode {
-        FAVORITES_ACCENT
+        p.yellow
     } else if app.language == Language::All {
         app.selected()
-            .map(|p| p.language.accent())
+            .map(|pkg| pkg.language.accent())
             .unwrap_or(app.language.accent())
     } else {
         app.language.accent()
@@ -383,7 +388,7 @@ fn draw_detail_view(f: &mut Frame, app: &App, area: Rect) {
         .border_type(BorderType::Rounded)
         .border_style(Style::new().fg(accent))
         .title(Span::styled(" detail ", Style::new().fg(accent).bold()))
-        .title_bottom(Span::styled(" esc / q → back ", Style::new().fg(DIM)));
+        .title_bottom(Span::styled(" esc / q → back ", Style::new().fg(p.dim)));
 
     let inner = block.inner(area);
     f.render_widget(block, area);
@@ -406,68 +411,94 @@ fn draw_detail_view(f: &mut Frame, app: &App, area: Rect) {
     ]));
     lines.push(Line::from(Span::styled(
         "═".repeat(w.min(54)),
-        Style::new().fg(DIM),
+        Style::new().fg(p.dim),
     )));
     lines.push(Line::from(""));
 
     // Description
     if !pkg.description.is_empty() {
-        lines.push(section("description"));
+        lines.push(section("description", p.dim));
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
             pkg.description.clone(),
-            Style::new().fg(WHITE),
+            Style::new().fg(p.white),
         )));
         lines.push(Line::from(""));
     }
 
     // Downloads
-    lines.push(section("downloads"));
+    lines.push(section("downloads", p.dim));
     lines.push(Line::from(""));
-    lines.push(kv("  all-time   ", fmt::dl_full(pkg.downloads_all), accent));
+    lines.push(kv(
+        "  all-time   ",
+        fmt::dl_full(pkg.downloads_all),
+        accent,
+        p.dim,
+    ));
     lines.push(kv(
         "  recent     ",
         fmt::dl_full(pkg.downloads_recent),
         accent,
+        p.dim,
     ));
     lines.push(Line::from(""));
 
     // GitHub
-    lines.push(section("github"));
+    lines.push(section("github", p.dim));
     lines.push(Line::from(""));
     match &app.gh {
         GhState::Loading => {
             lines.push(Line::from(Span::styled(
                 "  loading…",
-                Style::new().fg(DIM).italic(),
+                Style::new().fg(p.dim).italic(),
             )));
         }
         GhState::Live(stats) => {
-            lines.push(kv("  ★ stars    ", stats.stars.to_string(), YELLOW));
-            lines.push(kv("  ⑂ forks    ", stats.forks.to_string(), accent));
-            lines.push(kv("  ⊙ issues   ", stats.issues.to_string(), WHITE));
+            lines.push(kv(
+                "  ★ stars    ",
+                stats.stars.to_string(),
+                p.yellow,
+                p.dim,
+            ));
+            lines.push(kv("  ⑂ forks    ", stats.forks.to_string(), accent, p.dim));
+            lines.push(kv(
+                "  ⊙ issues   ",
+                stats.issues.to_string(),
+                p.white,
+                p.dim,
+            ));
             lines.push(Line::from(Span::styled(
                 "  (live)",
-                Style::new().fg(GREEN).italic(),
+                Style::new().fg(p.green).italic(),
             )));
         }
         GhState::Cached(entry) => {
-            lines.push(kv("  ★ stars    ", entry.stars.to_string(), YELLOW));
-            lines.push(kv("  ⑂ forks    ", entry.forks.to_string(), accent));
-            lines.push(kv("  ⊙ issues   ", entry.issues.to_string(), WHITE));
+            lines.push(kv(
+                "  ★ stars    ",
+                entry.stars.to_string(),
+                p.yellow,
+                p.dim,
+            ));
+            lines.push(kv("  ⑂ forks    ", entry.forks.to_string(), accent, p.dim));
+            lines.push(kv(
+                "  ⊙ issues   ",
+                entry.issues.to_string(),
+                p.white,
+                p.dim,
+            ));
             lines.push(Line::from(Span::styled(
                 format!("  (cached {})", entry.age_label()),
-                Style::new().fg(DIM).italic(),
+                Style::new().fg(p.dim).italic(),
             )));
         }
         GhState::RateLimited => {
             lines.push(Line::from(Span::styled(
                 "  rate limited (60 req/h)",
-                Style::new().fg(YELLOW),
+                Style::new().fg(p.yellow),
             )));
             lines.push(Line::from(Span::styled(
                 "  set GITHUB_TOKEN to raise limit to 5000/h",
-                Style::new().fg(DIM).italic(),
+                Style::new().fg(p.dim).italic(),
             )));
         }
         GhState::BadToken => {
@@ -477,56 +508,58 @@ fn draw_detail_view(f: &mut Frame, app: &App, area: Rect) {
             )));
             lines.push(Line::from(Span::styled(
                 "  update via ? → settings or GITHUB_TOKEN env var",
-                Style::new().fg(DIM).italic(),
+                Style::new().fg(p.dim).italic(),
             )));
         }
         GhState::Unavailable => {
             lines.push(Line::from(Span::styled(
                 "  stats unavailable",
-                Style::new().fg(DIM),
+                Style::new().fg(p.dim),
             )));
         }
         GhState::NoRepo => {
             lines.push(Line::from(Span::styled(
                 "  no repository",
-                Style::new().fg(DIM),
+                Style::new().fg(p.dim),
             )));
         }
     }
     lines.push(Line::from(""));
 
     // Links
-    lines.push(section("links"));
+    lines.push(section("links", p.dim));
     lines.push(Line::from(""));
     if let Some(u) = &pkg.docs_url {
-        lines.push(url_line("  📖 docs     ", u.clone(), accent));
+        lines.push(url_line("  📖 docs     ", u.clone(), accent, p.dim));
     }
     if let Some(u) = &pkg.hex_url {
-        lines.push(url_line("  ◈  hex.pm   ", u.clone(), accent));
+        lines.push(url_line("  ◈  hex.pm   ", u.clone(), accent, p.dim));
     }
     if let Some(u) = &pkg.repo_url {
-        lines.push(url_line("  ⌥  repo     ", u.clone(), accent));
+        lines.push(url_line("  ⌥  repo     ", u.clone(), accent, p.dim));
     }
     lines.push(Line::from(""));
 
     // Metadata
-    lines.push(section("metadata"));
+    lines.push(section("metadata", p.dim));
     lines.push(Line::from(""));
     if !pkg.build_tool.is_empty() {
-        lines.push(kv("  build tool ", pkg.build_tool.clone(), WHITE));
+        lines.push(kv("  build tool ", pkg.build_tool.clone(), p.white, p.dim));
     }
     lines.push(kv(
         "  updated    ",
         fmt::date(&pkg.updated_at).to_string(),
-        WHITE,
+        p.white,
+        p.dim,
     ));
     lines.push(kv(
         "  published  ",
         fmt::date(&pkg.inserted_at).to_string(),
-        WHITE,
+        p.white,
+        p.dim,
     ));
     if !pkg.licenses.is_empty() {
-        lines.push(kv("  license    ", pkg.licenses.join(", "), WHITE));
+        lines.push(kv("  license    ", pkg.licenses.join(", "), p.white, p.dim));
     }
 
     f.render_widget(
@@ -539,16 +572,15 @@ fn draw_detail_view(f: &mut Frame, app: &App, area: Rect) {
 
 // ── Settings view ─────────────────────────────────────────────────────────────
 
-const SETTINGS_ACCENT: Color = Color::Rgb(97, 218, 251); // neutral BEAM cyan
-
 fn draw_settings_view(f: &mut Frame, app: &App, area: Rect) {
+    let p = pal(app);
     let ac = SETTINGS_ACCENT;
 
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
         .border_style(Style::new().fg(ac))
         .title(Span::styled(" ⚙ settings ", Style::new().fg(ac).bold()))
-        .title_bottom(Span::styled(" esc / q → back ", Style::new().fg(DIM)));
+        .title_bottom(Span::styled(" esc / q → back ", Style::new().fg(p.dim)));
     let inner = block.inner(area);
     f.render_widget(block, area);
 
@@ -559,26 +591,26 @@ fn draw_settings_view(f: &mut Frame, app: &App, area: Rect) {
     // ── GitHub section ────────────────────────────────────────────────────────
     lines.push(Line::from(Span::styled(
         "  github",
-        Style::new().fg(DIM).bold(),
+        Style::new().fg(p.dim).bold(),
     )));
     lines.push(Line::from(""));
 
     // Token row
     let is_token = rows[cursor] == SettingRow::GithubToken;
     let prefix = if is_token { "▶  " } else { "   " };
-    let row_color = if is_token { ac } else { WHITE };
+    let row_color = if is_token { ac } else { p.white };
 
     let token_val: Line = if app.settings_editing {
         Line::from(vec![
             Span::styled(prefix, Style::new().fg(ac).bold()),
-            Span::styled("token    ", Style::new().fg(DIM)),
+            Span::styled("token    ", Style::new().fg(p.dim)),
             Span::styled(
                 format!("[{}█]", app.settings_input),
-                Style::new().fg(YELLOW).bold(),
+                Style::new().fg(p.yellow).bold(),
             ),
             Span::styled(
                 "  enter to confirm · esc to cancel",
-                Style::new().fg(DIM).italic(),
+                Style::new().fg(p.dim).italic(),
             ),
         ])
     } else {
@@ -594,36 +626,65 @@ fn draw_settings_view(f: &mut Frame, app: &App, area: Rect) {
         };
         Line::from(vec![
             Span::styled(prefix, Style::new().fg(ac).bold()),
-            Span::styled("token    ", Style::new().fg(DIM)),
+            Span::styled("token    ", Style::new().fg(p.dim)),
             Span::styled(val, Style::new().fg(row_color).bold()),
-            Span::styled(hint, Style::new().fg(DIM).italic()),
+            Span::styled(hint, Style::new().fg(p.dim).italic()),
         ])
     };
     lines.push(token_val);
     lines.push(Line::from(Span::styled(
         "             ~/.config/hexplorer/credentials.json (0600)",
-        Style::new().fg(DIM).italic(),
+        Style::new().fg(p.dim).italic(),
     )));
+    lines.push(Line::from(""));
+
+    // ── Appearance section ────────────────────────────────────────────────────
+    lines.push(Line::from(Span::styled(
+        "  appearance",
+        Style::new().fg(p.dim).bold(),
+    )));
+    lines.push(Line::from(""));
+
+    // color_scheme row
+    let is_cs = rows[cursor] == SettingRow::ColorScheme;
+    let (pre, col) = if is_cs {
+        ("▶  ", ac)
+    } else {
+        ("   ", p.white)
+    };
+    lines.push(Line::from(vec![
+        Span::styled(pre, Style::new().fg(ac).bold()),
+        Span::styled("color_scheme  ", Style::new().fg(p.dim)),
+        Span::styled(
+            app.settings_config.color_scheme.label(),
+            Style::new().fg(col).bold(),
+        ),
+        Span::styled("  ← →", Style::new().fg(p.dim).italic()),
+    ]));
     lines.push(Line::from(""));
 
     // ── Storage section ───────────────────────────────────────────────────────
     lines.push(Line::from(Span::styled(
         "  storage",
-        Style::new().fg(DIM).bold(),
+        Style::new().fg(p.dim).bold(),
     )));
     lines.push(Line::from(""));
 
     // keep_weeks row
     let is_kw = rows[cursor] == SettingRow::KeepWeeks;
-    let (pre, col) = if is_kw { ("▶  ", ac) } else { ("   ", WHITE) };
+    let (pre, col) = if is_kw {
+        ("▶  ", ac)
+    } else {
+        ("   ", p.white)
+    };
     lines.push(Line::from(vec![
         Span::styled(pre, Style::new().fg(ac).bold()),
-        Span::styled("keep_weeks  ", Style::new().fg(DIM)),
+        Span::styled("keep_weeks  ", Style::new().fg(p.dim)),
         Span::styled(
             format!("{} weeks", app.settings_config.keep_weeks),
             Style::new().fg(col).bold(),
         ),
-        Span::styled("  ← →", Style::new().fg(DIM).italic()),
+        Span::styled("  ← →", Style::new().fg(p.dim).italic()),
     ]));
 
     // compress row
@@ -631,7 +692,7 @@ fn draw_settings_view(f: &mut Frame, app: &App, area: Rect) {
     let (pre, col) = if is_cmp {
         ("▶  ", ac)
     } else {
-        ("   ", WHITE)
+        ("   ", p.white)
     };
     let compress_val = if app.settings_config.compress {
         "on"
@@ -640,23 +701,27 @@ fn draw_settings_view(f: &mut Frame, app: &App, area: Rect) {
     };
     lines.push(Line::from(vec![
         Span::styled(pre, Style::new().fg(ac).bold()),
-        Span::styled("compress    ", Style::new().fg(DIM)),
+        Span::styled("compress    ", Style::new().fg(p.dim)),
         Span::styled(compress_val, Style::new().fg(col).bold()),
-        Span::styled("  enter to toggle", Style::new().fg(DIM).italic()),
+        Span::styled("  enter to toggle", Style::new().fg(p.dim).italic()),
     ]));
 
     // gh cache row
     let is_gc = rows[cursor] == SettingRow::ClearGhCache;
-    let (pre, col) = if is_gc { ("▶  ", ac) } else { ("   ", WHITE) };
+    let (pre, col) = if is_gc {
+        ("▶  ", ac)
+    } else {
+        ("   ", p.white)
+    };
     let cache_count = app.cache.len();
     lines.push(Line::from(vec![
         Span::styled(pre, Style::new().fg(ac).bold()),
-        Span::styled("gh cache    ", Style::new().fg(DIM)),
+        Span::styled("gh cache    ", Style::new().fg(p.dim)),
         Span::styled(
             format!("{cache_count} entries"),
             Style::new().fg(col).bold(),
         ),
-        Span::styled("  enter to clear", Style::new().fg(DIM).italic()),
+        Span::styled("  enter to clear", Style::new().fg(p.dim).italic()),
     ]));
 
     f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
@@ -676,83 +741,84 @@ fn mask_token_ui(t: &str) -> String {
 // ── Footer ────────────────────────────────────────────────────────────────────
 
 fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
+    let p = pal(app);
     let accent = accent(app);
 
     let spans: Vec<Span> = match app.view {
         View::List => {
             let mut spans = vec![
                 Span::styled(" /", Style::new().fg(accent).bold()),
-                Span::styled(" search  ", Style::new().fg(DIM)),
+                Span::styled(" search  ", Style::new().fg(p.dim)),
                 Span::styled("↑↓ j k", Style::new().fg(accent).bold()),
-                Span::styled(" nav  ", Style::new().fg(DIM)),
+                Span::styled(" nav  ", Style::new().fg(p.dim)),
                 Span::styled("↵", Style::new().fg(accent).bold()),
-                Span::styled(" detail  ", Style::new().fg(DIM)),
+                Span::styled(" detail  ", Style::new().fg(p.dim)),
                 Span::styled("l / L", Style::new().fg(accent).bold()),
-                Span::styled(" lang  ", Style::new().fg(DIM)),
+                Span::styled(" lang  ", Style::new().fg(p.dim)),
                 Span::styled("tab", Style::new().fg(accent).bold()),
-                Span::styled(" sort  ", Style::new().fg(DIM)),
+                Span::styled(" sort  ", Style::new().fg(p.dim)),
             ];
             // Show pagination hint only when browsing (no active query).
             if app.input.trim().is_empty() && (app.page > 1 || app.has_more) {
                 spans.push(Span::styled("[ ]", Style::new().fg(accent).bold()));
-                spans.push(Span::styled(" page  ", Style::new().fg(DIM)));
+                spans.push(Span::styled(" page  ", Style::new().fg(p.dim)));
             }
-            spans.push(Span::styled("s", Style::new().fg(YELLOW).bold()));
-            spans.push(Span::styled(" star  ", Style::new().fg(DIM)));
+            spans.push(Span::styled("s", Style::new().fg(p.yellow).bold()));
+            spans.push(Span::styled(" star  ", Style::new().fg(p.dim)));
             if !app.favorites.is_empty() || app.favorites_mode {
-                spans.push(Span::styled("f", Style::new().fg(YELLOW).bold()));
-                spans.push(Span::styled(" favorites  ", Style::new().fg(DIM)));
+                spans.push(Span::styled("f", Style::new().fg(p.yellow).bold()));
+                spans.push(Span::styled(" favorites  ", Style::new().fg(p.dim)));
             }
             spans.push(Span::styled("r", Style::new().fg(accent).bold()));
-            spans.push(Span::styled(" refresh  ", Style::new().fg(DIM)));
+            spans.push(Span::styled(" refresh  ", Style::new().fg(p.dim)));
             spans.push(Span::styled("?", Style::new().fg(accent).bold()));
-            spans.push(Span::styled(" settings  ", Style::new().fg(DIM)));
+            spans.push(Span::styled(" settings  ", Style::new().fg(p.dim)));
             spans.push(Span::styled("q", Style::new().fg(accent).bold()));
-            spans.push(Span::styled(" quit", Style::new().fg(DIM)));
+            spans.push(Span::styled(" quit", Style::new().fg(p.dim)));
             spans
         }
         View::Detail => vec![
             Span::styled(" esc / q", Style::new().fg(accent).bold()),
-            Span::styled(" back  ", Style::new().fg(DIM)),
+            Span::styled(" back  ", Style::new().fg(p.dim)),
             Span::styled("↑↓ j k", Style::new().fg(accent).bold()),
-            Span::styled(" scroll  ", Style::new().fg(DIM)),
+            Span::styled(" scroll  ", Style::new().fg(p.dim)),
             Span::styled("PgUp/Dn", Style::new().fg(accent).bold()),
-            Span::styled(" fast", Style::new().fg(DIM)),
+            Span::styled(" fast", Style::new().fg(p.dim)),
         ],
         View::Settings => vec![
             Span::styled(" esc / q", Style::new().fg(SETTINGS_ACCENT).bold()),
-            Span::styled(" back  ", Style::new().fg(DIM)),
+            Span::styled(" back  ", Style::new().fg(p.dim)),
             Span::styled("↑↓ j k", Style::new().fg(SETTINGS_ACCENT).bold()),
-            Span::styled(" navigate  ", Style::new().fg(DIM)),
+            Span::styled(" navigate  ", Style::new().fg(p.dim)),
             Span::styled("enter", Style::new().fg(SETTINGS_ACCENT).bold()),
-            Span::styled(" edit  ", Style::new().fg(DIM)),
+            Span::styled(" edit  ", Style::new().fg(p.dim)),
             Span::styled("← →", Style::new().fg(SETTINGS_ACCENT).bold()),
-            Span::styled(" cycle", Style::new().fg(DIM)),
+            Span::styled(" cycle", Style::new().fg(p.dim)),
         ],
     };
 
     f.render_widget(
-        Paragraph::new(Line::from(spans)).style(Style::new().bg(BG_BAR)),
+        Paragraph::new(Line::from(spans)).style(Style::new().bg(p.bg_bar)),
         area,
     );
 }
 
 // ── Line helpers ──────────────────────────────────────────────────────────────
 
-fn section(title: &'static str) -> Line<'static> {
-    Line::from(Span::styled(title, Style::new().fg(DIM).bold()))
+fn section(title: &'static str, dim: Color) -> Line<'static> {
+    Line::from(Span::styled(title, Style::new().fg(dim).bold()))
 }
 
-fn kv(key: &'static str, val: String, color: Color) -> Line<'static> {
+fn kv(key: &'static str, val: String, color: Color, dim: Color) -> Line<'static> {
     Line::from(vec![
-        Span::styled(key, Style::new().fg(DIM)),
+        Span::styled(key, Style::new().fg(dim)),
         Span::styled(val, Style::new().fg(color).bold()),
     ])
 }
 
-fn url_line(label: &'static str, url: String, color: Color) -> Line<'static> {
+fn url_line(label: &'static str, url: String, color: Color, dim: Color) -> Line<'static> {
     Line::from(vec![
-        Span::styled(label, Style::new().fg(DIM)),
+        Span::styled(label, Style::new().fg(dim)),
         Span::styled(url, Style::new().fg(color).underlined()),
     ])
 }
