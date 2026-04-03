@@ -11,7 +11,10 @@ use std::{collections::HashMap, fs, path::PathBuf};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::{export_types::Snapshot, types::{ColorScheme, Language}};
+use crate::{
+    export_types::Snapshot,
+    types::{ColorScheme, Language},
+};
 
 // ── Paths ─────────────────────────────────────────────────────────────────────
 

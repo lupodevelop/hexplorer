@@ -85,7 +85,10 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
 
     // ── Right: search + sort ──────────────────────────────────────────────────
     let (search_txt, search_sty) = if app.input_mode {
-        (format!("  /{}_", app.input), Style::new().fg(p.yellow).bold())
+        (
+            format!("  /{}_", app.input),
+            Style::new().fg(p.yellow).bold(),
+        )
     } else if app.input.is_empty() {
         (
             "  press / to search…".to_string(),
@@ -426,7 +429,12 @@ fn draw_detail_view(f: &mut Frame, app: &App, area: Rect) {
     // Downloads
     lines.push(section("downloads", p.dim));
     lines.push(Line::from(""));
-    lines.push(kv("  all-time   ", fmt::dl_full(pkg.downloads_all), accent, p.dim));
+    lines.push(kv(
+        "  all-time   ",
+        fmt::dl_full(pkg.downloads_all),
+        accent,
+        p.dim,
+    ));
     lines.push(kv(
         "  recent     ",
         fmt::dl_full(pkg.downloads_recent),
@@ -446,18 +454,38 @@ fn draw_detail_view(f: &mut Frame, app: &App, area: Rect) {
             )));
         }
         GhState::Live(stats) => {
-            lines.push(kv("  ★ stars    ", stats.stars.to_string(), p.yellow, p.dim));
+            lines.push(kv(
+                "  ★ stars    ",
+                stats.stars.to_string(),
+                p.yellow,
+                p.dim,
+            ));
             lines.push(kv("  ⑂ forks    ", stats.forks.to_string(), accent, p.dim));
-            lines.push(kv("  ⊙ issues   ", stats.issues.to_string(), p.white, p.dim));
+            lines.push(kv(
+                "  ⊙ issues   ",
+                stats.issues.to_string(),
+                p.white,
+                p.dim,
+            ));
             lines.push(Line::from(Span::styled(
                 "  (live)",
                 Style::new().fg(p.green).italic(),
             )));
         }
         GhState::Cached(entry) => {
-            lines.push(kv("  ★ stars    ", entry.stars.to_string(), p.yellow, p.dim));
+            lines.push(kv(
+                "  ★ stars    ",
+                entry.stars.to_string(),
+                p.yellow,
+                p.dim,
+            ));
             lines.push(kv("  ⑂ forks    ", entry.forks.to_string(), accent, p.dim));
-            lines.push(kv("  ⊙ issues   ", entry.issues.to_string(), p.white, p.dim));
+            lines.push(kv(
+                "  ⊙ issues   ",
+                entry.issues.to_string(),
+                p.white,
+                p.dim,
+            ));
             lines.push(Line::from(Span::styled(
                 format!("  (cached {})", entry.age_label()),
                 Style::new().fg(p.dim).italic(),
@@ -619,11 +647,18 @@ fn draw_settings_view(f: &mut Frame, app: &App, area: Rect) {
 
     // color_scheme row
     let is_cs = rows[cursor] == SettingRow::ColorScheme;
-    let (pre, col) = if is_cs { ("▶  ", ac) } else { ("   ", p.white) };
+    let (pre, col) = if is_cs {
+        ("▶  ", ac)
+    } else {
+        ("   ", p.white)
+    };
     lines.push(Line::from(vec![
         Span::styled(pre, Style::new().fg(ac).bold()),
         Span::styled("color_scheme  ", Style::new().fg(p.dim)),
-        Span::styled(app.settings_config.color_scheme.label(), Style::new().fg(col).bold()),
+        Span::styled(
+            app.settings_config.color_scheme.label(),
+            Style::new().fg(col).bold(),
+        ),
         Span::styled("  ← →", Style::new().fg(p.dim).italic()),
     ]));
     lines.push(Line::from(""));
@@ -637,7 +672,11 @@ fn draw_settings_view(f: &mut Frame, app: &App, area: Rect) {
 
     // keep_weeks row
     let is_kw = rows[cursor] == SettingRow::KeepWeeks;
-    let (pre, col) = if is_kw { ("▶  ", ac) } else { ("   ", p.white) };
+    let (pre, col) = if is_kw {
+        ("▶  ", ac)
+    } else {
+        ("   ", p.white)
+    };
     lines.push(Line::from(vec![
         Span::styled(pre, Style::new().fg(ac).bold()),
         Span::styled("keep_weeks  ", Style::new().fg(p.dim)),
@@ -650,8 +689,16 @@ fn draw_settings_view(f: &mut Frame, app: &App, area: Rect) {
 
     // compress row
     let is_cmp = rows[cursor] == SettingRow::Compress;
-    let (pre, col) = if is_cmp { ("▶  ", ac) } else { ("   ", p.white) };
-    let compress_val = if app.settings_config.compress { "on" } else { "off" };
+    let (pre, col) = if is_cmp {
+        ("▶  ", ac)
+    } else {
+        ("   ", p.white)
+    };
+    let compress_val = if app.settings_config.compress {
+        "on"
+    } else {
+        "off"
+    };
     lines.push(Line::from(vec![
         Span::styled(pre, Style::new().fg(ac).bold()),
         Span::styled("compress    ", Style::new().fg(p.dim)),
@@ -661,7 +708,11 @@ fn draw_settings_view(f: &mut Frame, app: &App, area: Rect) {
 
     // gh cache row
     let is_gc = rows[cursor] == SettingRow::ClearGhCache;
-    let (pre, col) = if is_gc { ("▶  ", ac) } else { ("   ", p.white) };
+    let (pre, col) = if is_gc {
+        ("▶  ", ac)
+    } else {
+        ("   ", p.white)
+    };
     let cache_count = app.cache.len();
     lines.push(Line::from(vec![
         Span::styled(pre, Style::new().fg(ac).bold()),
