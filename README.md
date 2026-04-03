@@ -7,7 +7,7 @@
 
 [![crates.io](https://img.shields.io/crates/v/hexplorer.svg)](https://crates.io/crates/hexplorer) [![docs.rs](https://img.shields.io/docsrs/hexplorer.svg)](https://docs.rs/hexplorer) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Workflow](https://img.shields.io/github/actions/workflow/status/lupodevelop/hexplorer/ci.yml?branch=main)](https://github.com/lupodevelop/hexplorer/actions)
 
-Terminal UI for browsing [HEX.pm](https://hex.pm) the package registry for the BEAM ecosystem (Gleam, Elixir, Erlang).
+Terminal UI for browsing [Hex.pm](https://hex.pm) the package registry for the BEAM ecosystem (Gleam, Elixir, Erlang).
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/lupodevelop/hexplorer/e705653c020fc332c5b8c5f45fc0a6b034e15330/assets/img/terminal.png" alt="hexplorer TUI screenshot" width="640" />
