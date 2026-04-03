@@ -4,6 +4,14 @@ All notable changes to hexplorer are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+## [0.1.3] — 2026-04-03
+
+### Added
+- `?` settings screen now includes a `color_scheme` option with `←`/`→` to cycle themes (Default, Dracula, Nord, Gruvbox).
+
+### Changed
+- UI now persistently loads selected color scheme from storage meta.
+
 ## [0.1.2] — 2026-04-02
 
 ### Changed
