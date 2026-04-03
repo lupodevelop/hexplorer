@@ -8,6 +8,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - `hexplorer storage config default_language=<gleam|elixir|erlang|all>` to persist startup language.
 - `?` settings screen now includes a `default_language` row and `color_scheme` row with `←`/`→` to cycle values.
+- `Ctrl+W` / `Ctrl+Backspace` now delete the previous word in search mode and in the GitHub token input field.
 
 ### Changed
 - `hexplorer` now loads `default_language` from `~/.cache/hexplorer/meta.json` when `--lang` is not explicitly passed.
