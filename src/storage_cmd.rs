@@ -190,11 +190,19 @@ fn run_config(arg: Option<&str>) -> Result<()> {
             let token_display = storage::load_github_token()
                 .map(|t| mask_token(&t))
                 .unwrap_or_else(|| "(not set — falls back to GITHUB_TOKEN env var)".into());
-            println!("\n  retention  keep_weeks       = {}", meta.config.keep_weeks);
+            println!(
+                "\n  retention  keep_weeks       = {}",
+                meta.config.keep_weeks
+            );
             println!("  storage    compress         = {}", meta.config.compress);
             println!("  github     token            = {}", token_display);
-            println!("             stored in        ~/.config/hexplorer/credentials.json (mode 0600)");
-            println!("  app        default_language = {}", meta.config.default_language);
+            println!(
+                "             stored in        ~/.config/hexplorer/credentials.json (mode 0600)"
+            );
+            println!(
+                "  app        default_language = {}",
+                meta.config.default_language
+            );
             println!();
         }
         Some(kv) => {

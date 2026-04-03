@@ -647,7 +647,11 @@ fn draw_settings_view(f: &mut Frame, app: &App, area: Rect) {
 
     // color_scheme row
     let is_cs = rows[cursor] == SettingRow::ColorScheme;
-    let (pre, col) = if is_cs { ("▶  ", ac) } else { ("   ", p.white) };
+    let (pre, col) = if is_cs {
+        ("▶  ", ac)
+    } else {
+        ("   ", p.white)
+    };
     lines.push(Line::from(vec![
         Span::styled(pre, Style::new().fg(ac).bold()),
         Span::styled("color_scheme      ", Style::new().fg(p.dim)),
@@ -660,7 +664,11 @@ fn draw_settings_view(f: &mut Frame, app: &App, area: Rect) {
 
     // default_language row
     let is_dl = rows[cursor] == SettingRow::DefaultLanguage;
-    let (pre, col) = if is_dl { ("▶  ", ac) } else { ("   ", p.white) };
+    let (pre, col) = if is_dl {
+        ("▶  ", ac)
+    } else {
+        ("   ", p.white)
+    };
     lines.push(Line::from(vec![
         Span::styled(pre, Style::new().fg(ac).bold()),
         Span::styled("default_language  ", Style::new().fg(p.dim)),
