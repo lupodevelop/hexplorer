@@ -17,6 +17,12 @@ use crate::{
     types::{ColorScheme, Language, LinkStyle, SettingRow, Sort, View},
 };
 
+// ── Type aliases ─────────────────────────────────────────────────────────────
+
+type PkgCacheKey = (String, String, Language, u32);
+type PkgCacheValue = (Vec<Package>, bool);
+type PkgCache = HashMap<PkgCacheKey, PkgCacheValue>;
+
 // ── GitHub fetch state ────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone)]
@@ -97,7 +103,7 @@ pub struct App {
     pub link_cursor: Option<usize>,
     /// In-memory session cache for listing responses.
     /// Key: (query, sort_param, language, page). Cleared on manual refresh.
-    pkg_cache: std::collections::HashMap<(String, String, Language, u32), (Vec<Package>, bool)>,
+    pkg_cache: PkgCache,
     /// True when the last listing was served from `pkg_cache` instead of the network.
     pub from_cache: bool,
     /// True while a single-package detail fetch is in flight.
