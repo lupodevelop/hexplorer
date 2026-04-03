@@ -21,6 +21,8 @@ pub enum StorageSubcmd {
 pub struct Args {
     pub output: Option<OutputFormat>,
     pub language: Language,
+    /// `true` when `--lang` was explicitly passed; `false` means fall back to config default.
+    pub lang_explicit: bool,
     pub search: Option<String>,
     pub sort: Sort,
     /// Package name for `--output detail <name>`.
@@ -75,6 +77,7 @@ pub fn parse_from(raw: &[String]) -> anyhow::Result<Args> {
                     anyhow::anyhow!("--lang requires a value (gleam|elixir|erlang|all)")
                 })?;
                 args.language = lang.parse().map_err(|e: String| anyhow::anyhow!(e))?;
+                args.lang_explicit = true;
             }
             "--search" | "-s" => {
                 i += 1;
