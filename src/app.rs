@@ -11,7 +11,7 @@ use crate::{
     cache::{self, CacheMap, CachedEntry},
     favorites,
     storage::{self, StorageConfig},
-    types::{Language, SettingRow, Sort, View},
+    types::{ColorScheme, Language, SettingRow, Sort, View},
 };
 
 // ── GitHub fetch state ────────────────────────────────────────────────────────
@@ -72,6 +72,8 @@ pub struct App {
     pub favorites: HashMap<String, crate::types::Language>,
     /// When `true`, the list shows only starred packages (fetched individually by name).
     pub favorites_mode: bool,
+    /// Active color scheme — loaded from config at startup, changed live via settings.
+    pub color_scheme: ColorScheme,
     // ── Settings screen state ─────────────────────────────────────────────────
     /// Index into `SettingRow::all()` for the settings cursor.
     pub settings_cursor: usize,
@@ -110,6 +112,9 @@ impl App {
             token: github_token(),
             favorites: favorites::load(),
             favorites_mode: false,
+            color_scheme: storage::load_meta()
+                .map(|m| m.config.color_scheme)
+                .unwrap_or_default(),
             settings_cursor: 0,
             settings_editing: false,
             settings_input: String::new(),
@@ -306,6 +311,7 @@ impl App {
                     }
                 }
                 SettingRow::KeepWeeks => {}
+                SettingRow::ColorScheme => {}
             },
 
             // `d` on the token row clears it.
@@ -332,6 +338,19 @@ impl App {
                     (cur + 1).min(PRESETS.len() - 1)
                 };
                 self.settings_config.keep_weeks = PRESETS[next];
+                self.persist_settings_config();
+            }
+
+            // ← / → cycle color scheme.
+            KeyCode::Left | KeyCode::Right
+                if rows.get(self.settings_cursor) == Some(&SettingRow::ColorScheme) =>
+            {
+                self.settings_config.color_scheme = if key.code == KeyCode::Left {
+                    self.settings_config.color_scheme.cycle_back()
+                } else {
+                    self.settings_config.color_scheme.cycle()
+                };
+                self.color_scheme = self.settings_config.color_scheme;
                 self.persist_settings_config();
             }
 
