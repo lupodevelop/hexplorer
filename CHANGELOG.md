@@ -13,6 +13,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `hexplorer` now loads `default_language` from `~/.cache/hexplorer/meta.json` when `--lang` is not explicitly passed.
 - UI now persistently loads selected color scheme from storage meta.
 
+### Fixed
+
+- `Ctrl+W` / `Ctrl+Backspace` had no effect in search mode (issue #3).
+
 ## [0.1.2] — 2026-04-02
 
 ### Changed

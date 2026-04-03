@@ -82,6 +82,8 @@ hexplorer storage config github_token=           # remove stored token
 |-----|--------|
 | `/` | Enter search mode |
 | `Enter` | Submit search / open detail |
+| `Backspace` | Delete previous character (search mode) |
+| `Ctrl+W` / `Ctrl+Backspace` | Delete previous word (search mode) |
 | `Esc` / `q` | Back / quit |
 | `↑↓` `j k` | Navigate list |
 | `PgUp/Dn` | Fast scroll |

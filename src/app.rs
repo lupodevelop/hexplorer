@@ -268,6 +268,12 @@ impl App {
                     self.settings_editing = false;
                     self.settings_input.clear();
                 }
+                KeyCode::Backspace if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    delete_word_back(&mut self.settings_input);
+                }
+                KeyCode::Char('w') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    delete_word_back(&mut self.settings_input);
+                }
                 KeyCode::Backspace => {
                     self.settings_input.pop();
                 }
@@ -524,6 +530,12 @@ impl App {
                 self.page = 1;
                 self.load();
             }
+            KeyCode::Backspace if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                delete_word_back(&mut self.input);
+            }
+            KeyCode::Char('w') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                delete_word_back(&mut self.input);
+            }
             KeyCode::Backspace => {
                 self.input.pop();
             }
@@ -608,5 +620,18 @@ impl App {
             _ => {}
         }
         false
+    }
+}
+
+// ── Text editing helpers ───────────────────────────────────────────────────────
+
+/// Remove the last word from `s` — strips trailing whitespace then non-whitespace.
+/// This is the standard Ctrl+W / Ctrl+Backspace behaviour.
+fn delete_word_back(s: &mut String) {
+    while s.ends_with(char::is_whitespace) {
+        s.pop();
+    }
+    while s.ends_with(|c: char| !c.is_whitespace()) {
+        s.pop();
     }
 }
