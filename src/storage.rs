@@ -11,7 +11,7 @@ use std::{collections::HashMap, fs, path::PathBuf};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::{export_types::Snapshot, types::Language};
+use crate::{export_types::Snapshot, types::{ColorScheme, Language}};
 
 // ── Paths ─────────────────────────────────────────────────────────────────────
 
@@ -60,6 +60,9 @@ pub struct StorageConfig {
     pub keep_weeks: u32,
     /// Gzip compress snapshots. Off by default for human-readability.
     pub compress: bool,
+    /// UI color scheme. Defaults to `Default` (original dark purple theme).
+    #[serde(default)]
+    pub color_scheme: ColorScheme,
 }
 
 impl Default for StorageConfig {
@@ -67,6 +70,7 @@ impl Default for StorageConfig {
         Self {
             keep_weeks: 12,
             compress: false,
+            color_scheme: ColorScheme::Default,
         }
     }
 }
