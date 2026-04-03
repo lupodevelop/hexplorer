@@ -647,16 +647,25 @@ fn draw_settings_view(f: &mut Frame, app: &App, area: Rect) {
 
     // color_scheme row
     let is_cs = rows[cursor] == SettingRow::ColorScheme;
-    let (pre, col) = if is_cs {
-        ("▶  ", ac)
-    } else {
-        ("   ", p.white)
-    };
+    let (pre, col) = if is_cs { ("▶  ", ac) } else { ("   ", p.white) };
     lines.push(Line::from(vec![
         Span::styled(pre, Style::new().fg(ac).bold()),
-        Span::styled("color_scheme  ", Style::new().fg(p.dim)),
+        Span::styled("color_scheme      ", Style::new().fg(p.dim)),
         Span::styled(
             app.settings_config.color_scheme.label(),
+            Style::new().fg(col).bold(),
+        ),
+        Span::styled("  ← →", Style::new().fg(p.dim).italic()),
+    ]));
+
+    // default_language row
+    let is_dl = rows[cursor] == SettingRow::DefaultLanguage;
+    let (pre, col) = if is_dl { ("▶  ", ac) } else { ("   ", p.white) };
+    lines.push(Line::from(vec![
+        Span::styled(pre, Style::new().fg(ac).bold()),
+        Span::styled("default_language  ", Style::new().fg(p.dim)),
+        Span::styled(
+            app.settings_config.default_language.label(),
             Style::new().fg(col).bold(),
         ),
         Span::styled("  ← →", Style::new().fg(p.dim).italic()),
