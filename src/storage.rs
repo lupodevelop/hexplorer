@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     export_types::Snapshot,
-    types::{ColorScheme, Language},
+    types::{ColorScheme, Language, LinkStyle},
 };
 
 // ── Paths ─────────────────────────────────────────────────────────────────────
@@ -69,6 +69,9 @@ pub struct StorageConfig {
     /// Language to open when `--lang` is not passed on the CLI.
     #[serde(default)]
     pub default_language: Language,
+    /// How the selected link is highlighted in the detail view.
+    #[serde(default)]
+    pub link_style: LinkStyle,
 }
 
 impl Default for StorageConfig {
@@ -78,6 +81,7 @@ impl Default for StorageConfig {
             compress: false,
             color_scheme: ColorScheme::Default,
             default_language: Language::default(),
+            link_style: LinkStyle::default(),
         }
     }
 }

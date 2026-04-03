@@ -221,6 +221,7 @@ pub enum View {
 pub enum SettingRow {
     GithubToken,
     ColorScheme,
+    LinkStyle,
     DefaultLanguage,
     KeepWeeks,
     Compress,
@@ -232,6 +233,7 @@ impl SettingRow {
         &[
             Self::GithubToken,
             Self::ColorScheme,
+            Self::LinkStyle,
             Self::DefaultLanguage,
             Self::KeepWeeks,
             Self::Compress,
@@ -326,6 +328,38 @@ pub struct Palette {
     pub white: Color,
     pub bg_bar: Color,
     pub bg_sel: Color,
+}
+
+// ── LinkStyle ─────────────────────────────────────────────────────────────────
+
+/// How the selected link is highlighted in the detail view.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum LinkStyle {
+    /// Vim-like: show `▶` cursor next to the selected link.
+    #[default]
+    Cursor,
+    /// Block: selected link row gets a solid accent-color background.
+    Block,
+}
+
+impl LinkStyle {
+    pub fn label(self) -> &'static str {
+        match self {
+            LinkStyle::Cursor => "Cursor ▶",
+            LinkStyle::Block => "Block ■",
+        }
+    }
+
+    pub fn cycle(self) -> Self {
+        match self {
+            LinkStyle::Cursor => LinkStyle::Block,
+            LinkStyle::Block => LinkStyle::Cursor,
+        }
+    }
+
+    pub fn cycle_back(self) -> Self {
+        self.cycle() // only two variants — same result
+    }
 }
 
 // ── OutputFormat ──────────────────────────────────────────────────────────────

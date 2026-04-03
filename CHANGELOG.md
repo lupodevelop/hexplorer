@@ -9,6 +9,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `hexplorer storage config default_language=<gleam|elixir|erlang|all>` to persist startup language.
 - `?` settings screen now includes a `default_language` row and `color_scheme` row with `←`/`→` to cycle values.
 - `Ctrl+W` / `Ctrl+Backspace` now delete the previous word in search mode and in the GitHub token input field.
+- Detail view: `Tab` / `Shift+Tab` cycle a cursor through the available links (docs, hex.pm, repo). `Enter` opens the selected link in the system browser.
+- Settings screen: new `link_style` row (under Appearance) cycles between `Cursor ▶` (vim-like marker) and `Block ■` (solid accent-color background on the selected link row). Setting persists to `meta.json`.
 
 ### Changed
 - `hexplorer` now loads `default_language` from `~/.cache/hexplorer/meta.json` when `--lang` is not explicitly passed.

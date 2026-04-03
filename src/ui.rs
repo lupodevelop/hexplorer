@@ -8,7 +8,7 @@ use ratatui::{
 use crate::{
     app::{App, GhState},
     fmt,
-    types::{Language, Palette, SettingRow, View},
+    types::{Language, LinkStyle, Palette, SettingRow, View},
 };
 
 // ── Settings view accent (fixed BEAM cyan — not subject to theming) ───────────
@@ -529,14 +529,39 @@ fn draw_detail_view(f: &mut Frame, app: &App, area: Rect) {
     // Links
     lines.push(section("links", p.dim));
     lines.push(Line::from(""));
+    let mut link_idx: usize = 0;
     if let Some(u) = &pkg.docs_url {
-        lines.push(url_line("  📖 docs     ", u.clone(), accent, p.dim));
+        lines.push(url_line(
+            "  📖 docs     ",
+            u.clone(),
+            accent,
+            p.dim,
+            app.link_cursor == Some(link_idx),
+            app.link_style,
+        ));
+        link_idx += 1;
     }
     if let Some(u) = &pkg.hex_url {
-        lines.push(url_line("  ◈  hex.pm   ", u.clone(), accent, p.dim));
+        lines.push(url_line(
+            "  ◈  hex.pm   ",
+            u.clone(),
+            accent,
+            p.dim,
+            app.link_cursor == Some(link_idx),
+            app.link_style,
+        ));
+        link_idx += 1;
     }
     if let Some(u) = &pkg.repo_url {
-        lines.push(url_line("  ⌥  repo     ", u.clone(), accent, p.dim));
+        lines.push(url_line(
+            "  ⌥  repo     ",
+            u.clone(),
+            accent,
+            p.dim,
+            app.link_cursor == Some(link_idx),
+            app.link_style,
+        ));
+        let _ = link_idx;
     }
     lines.push(Line::from(""));
 
@@ -657,6 +682,23 @@ fn draw_settings_view(f: &mut Frame, app: &App, area: Rect) {
         Span::styled("color_scheme      ", Style::new().fg(p.dim)),
         Span::styled(
             app.settings_config.color_scheme.label(),
+            Style::new().fg(col).bold(),
+        ),
+        Span::styled("  ← →", Style::new().fg(p.dim).italic()),
+    ]));
+
+    // link_style row
+    let is_ls = rows[cursor] == SettingRow::LinkStyle;
+    let (pre, col) = if is_ls {
+        ("▶  ", ac)
+    } else {
+        ("   ", p.white)
+    };
+    lines.push(Line::from(vec![
+        Span::styled(pre, Style::new().fg(ac).bold()),
+        Span::styled("link_style        ", Style::new().fg(p.dim)),
+        Span::styled(
+            app.settings_config.link_style.label(),
             Style::new().fg(col).bold(),
         ),
         Span::styled("  ← →", Style::new().fg(p.dim).italic()),
@@ -800,7 +842,11 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
             Span::styled("↑↓ j k", Style::new().fg(accent).bold()),
             Span::styled(" scroll  ", Style::new().fg(p.dim)),
             Span::styled("PgUp/Dn", Style::new().fg(accent).bold()),
-            Span::styled(" fast", Style::new().fg(p.dim)),
+            Span::styled(" fast  ", Style::new().fg(p.dim)),
+            Span::styled("tab", Style::new().fg(accent).bold()),
+            Span::styled(" link  ", Style::new().fg(p.dim)),
+            Span::styled("enter", Style::new().fg(accent).bold()),
+            Span::styled(" open", Style::new().fg(p.dim)),
         ],
         View::Settings => vec![
             Span::styled(" esc / q", Style::new().fg(SETTINGS_ACCENT).bold()),
@@ -833,9 +879,31 @@ fn kv(key: &'static str, val: String, color: Color, dim: Color) -> Line<'static>
     ])
 }
 
-fn url_line(label: &'static str, url: String, color: Color, dim: Color) -> Line<'static> {
-    Line::from(vec![
-        Span::styled(label, Style::new().fg(dim)),
-        Span::styled(url, Style::new().fg(color).underlined()),
-    ])
+fn url_line(
+    label: &'static str,
+    url: String,
+    color: Color,
+    dim: Color,
+    selected: bool,
+    link_style: LinkStyle,
+) -> Line<'static> {
+    // label starts with 2 ASCII spaces used as indent.
+    let (_, label_rest) = label.split_at(2);
+    match (selected, link_style) {
+        (true, LinkStyle::Block) => Line::from(vec![
+            Span::styled("  ", Style::new().bg(color).fg(Color::Black)),
+            Span::styled(label_rest, Style::new().bg(color).fg(Color::Black).bold()),
+            Span::styled(url, Style::new().bg(color).fg(Color::Black).bold()),
+        ]),
+        (true, LinkStyle::Cursor) => Line::from(vec![
+            Span::styled("▶ ", Style::new().fg(color).bold()),
+            Span::styled(label_rest, Style::new().fg(dim)),
+            Span::styled(url, Style::new().fg(color).bold().underlined()),
+        ]),
+        (false, _) => Line::from(vec![
+            Span::styled("  ", Style::new().fg(dim)),
+            Span::styled(label_rest, Style::new().fg(dim)),
+            Span::styled(url, Style::new().fg(color).underlined()),
+        ]),
+    }
 }
