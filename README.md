@@ -5,7 +5,7 @@
 
 # hexplorer
 
-[![crates.io](https://img.shields.io/crates/v/hexplorer.svg)](https://crates.io/crates/hexplorer) [![docs.rs](https://img.shields.io/docsrs/hexplorer.svg)](https://docs.rs/hexplorer) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Workflow](https://img.shields.io/github/actions/workflow/status/lupodevelop/hexplorer/ci.yml?branch=main)](https://github.com/lupodevelop/hexplorer/actions)
+[![crates.io](https://img.shields.io/crates/v/hexplorer.svg)](https://crates.io/crates/hexplorer) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Workflow](https://img.shields.io/github/actions/workflow/status/lupodevelop/hexplorer/ci.yml?branch=main)](https://github.com/lupodevelop/hexplorer/actions)
 
 Terminal UI for browsing [Hex.pm](https://hex.pm) the package registry for the BEAM ecosystem (Gleam, Elixir, Erlang).
 
@@ -78,8 +78,10 @@ hexplorer storage config github_token=           # remove stored token
 
 ## Keyboard shortcuts
 
+### List view
+
 | Key | Action |
-|-----|--------|
+| --- | --- |
 | `/` | Enter search mode |
 | `Enter` | Submit search / open detail |
 | `Backspace` | Delete previous character (search mode) |
@@ -94,6 +96,16 @@ hexplorer storage config github_token=           # remove stored token
 | `f` | Toggle favorites view (shows all starred packages) |
 | `r` | Refresh |
 | `?` | Open settings |
+
+### Detail view
+
+| Key | Action |
+| --- | --- |
+| `Esc` / `q` | Back to list |
+| `↑↓` `j k` | Scroll |
+| `PgUp/Dn` | Fast scroll |
+| `Tab` / `Shift+Tab` | Cycle through available links (docs, hex.pm, repo) |
+| `Enter` | Open selected link in system browser |
 
 ## GitHub stats
 
