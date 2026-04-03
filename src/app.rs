@@ -7,12 +7,21 @@ use tokio::sync::mpsc::Sender;
 use std::collections::HashMap;
 
 use crate::{
-    api::{fetch_by_names, fetch_github_stats, fetch_packages, github_token, GhResult, Package},
+    api::{
+        fetch_by_names, fetch_github_stats, fetch_package, fetch_packages, github_token, GhResult,
+        Package,
+    },
     cache::{self, CacheMap, CachedEntry},
     favorites,
     storage::{self, StorageConfig},
     types::{ColorScheme, Language, LinkStyle, SettingRow, Sort, View},
 };
+
+// ── Type aliases ─────────────────────────────────────────────────────────────
+
+type PkgCacheKey = (String, String, Language, u32);
+type PkgCacheValue = (Vec<Package>, bool);
+type PkgCache = HashMap<PkgCacheKey, PkgCacheValue>;
 
 // ── GitHub fetch state ────────────────────────────────────────────────────────
 
@@ -42,6 +51,8 @@ pub enum Msg {
     /// `bool` = has_more (a next page exists).
     Loaded(u64, Vec<Package>, bool),
     GhFetched(String, GhResult), // (repo_url, result)
+    /// Single-package detail fetch result: (package_name, versions_newest_first).
+    DetailLoaded(String, Vec<String>),
     Err(String),
 }
 
@@ -90,6 +101,13 @@ pub struct App {
     /// Index of the currently highlighted link in the detail view (tab-navigated).
     /// Indexes into the ordered list [docs_url, hex_url, repo_url] filtered to Some values.
     pub link_cursor: Option<usize>,
+    /// In-memory session cache for listing responses.
+    /// Key: (query, sort_param, language, page). Cleared on manual refresh.
+    pkg_cache: PkgCache,
+    /// True when the last listing was served from `pkg_cache` instead of the network.
+    pub from_cache: bool,
+    /// True while a single-package detail fetch is in flight.
+    pub detail_loading: bool,
     tx: Sender<Msg>,
     /// Monotonically-increasing counter; each `load()` call increments it.
     /// `Msg::Loaded` carries the generation it was spawned with — results from
@@ -130,6 +148,9 @@ impl App {
             settings_config: StorageConfig::default(),
             settings_token: None,
             link_cursor: None,
+            pkg_cache: std::collections::HashMap::new(),
+            from_cache: false,
+            detail_loading: false,
             tx,
             fetch_gen: 0,
         }
@@ -138,15 +159,31 @@ impl App {
     // ── Data fetching ─────────────────────────────────────────────────────────
 
     pub fn load(&mut self) {
-        self.fetch_gen += 1;
-        let gen = self.fetch_gen;
-        self.loading = true;
-        self.error = None;
-        let tx = self.tx.clone();
-        let q = self.input.clone();
+        let q = self.input.trim().to_string();
         let s = self.sort.api_param().to_string();
         let lng = self.language;
         let pg = self.page;
+        let key = (q.clone(), s.clone(), lng, pg);
+
+        // Serve from session cache when available.
+        if let Some((pkgs, more)) = self.pkg_cache.get(&key) {
+            self.packages = pkgs.clone();
+            self.has_more = *more;
+            self.from_cache = true;
+            self.loading = false;
+            self.error = None;
+            if !self.packages.is_empty() {
+                self.list_state.select(Some(0));
+            }
+            return;
+        }
+
+        self.fetch_gen += 1;
+        let gen = self.fetch_gen;
+        self.loading = true;
+        self.from_cache = false;
+        self.error = None;
+        let tx = self.tx.clone();
         tokio::spawn(async move {
             match fetch_packages(&q, &s, lng, pg).await {
                 Ok((pkgs, more)) => {
@@ -155,6 +192,25 @@ impl App {
                 Err(e) => {
                     let _ = tx.send(Msg::Err(e.to_string())).await;
                 }
+            }
+        });
+    }
+
+    /// Trigger a single-package detail fetch if `versions` is not yet populated.
+    pub fn ensure_pkg_detail(&mut self) {
+        let Some(pkg) = self.selected() else { return };
+        if !pkg.versions.is_empty() {
+            return; // already have version history
+        }
+        let name = pkg.name.clone();
+        self.detail_loading = true;
+        let tx = self.tx.clone();
+        tokio::spawn(async move {
+            if let Ok(full) = fetch_package(&name).await {
+                let _ = tx.send(Msg::DetailLoaded(name, full.versions)).await;
+            } else {
+                // Silently swallow errors — detail view degrades gracefully.
+                let _ = tx.send(Msg::DetailLoaded(String::new(), vec![])).await;
             }
         });
     }
@@ -204,10 +260,26 @@ impl App {
                     return;
                 }
                 self.loading = false;
+                self.from_cache = false;
                 self.has_more = more;
-                self.packages = pkgs;
+                self.packages = pkgs.clone();
                 if !self.packages.is_empty() {
                     self.list_state.select(Some(0));
+                }
+                // Populate session cache so back-navigation is instant.
+                let key = (
+                    self.input.trim().to_string(),
+                    self.sort.api_param().to_string(),
+                    self.language,
+                    self.page,
+                );
+                self.pkg_cache.insert(key, (pkgs, more));
+            }
+            Msg::DetailLoaded(name, versions) => {
+                self.detail_loading = false;
+                // Patch the matching package in-place so the detail view updates live.
+                if let Some(pkg) = self.packages.iter_mut().find(|p| p.name == name) {
+                    pkg.versions = versions;
                 }
             }
             Msg::GhFetched(repo_url, result) => match result {
@@ -608,10 +680,13 @@ impl App {
                     self.scroll = 0;
                     self.link_cursor = None;
                     self.ensure_gh_stats();
+                    self.ensure_pkg_detail();
                 }
             }
             KeyCode::Char('r') => {
                 if !self.loading {
+                    self.pkg_cache.clear();
+                    self.from_cache = false;
                     if self.favorites_mode {
                         self.load_favorites();
                     } else {
@@ -690,6 +765,20 @@ impl App {
                         let _ = open::that(url);
                     }
                 }
+            }
+            // `r` — force-refresh GH stats + detail for the current package.
+            KeyCode::Char('r') => {
+                if let Some(repo_url) = self.selected().and_then(|p| p.repo_url.clone()) {
+                    self.cache.remove(&repo_url);
+                }
+                if let Some(idx) = self.list_state.selected() {
+                    if let Some(pkg) = self.packages.get_mut(idx) {
+                        pkg.versions.clear();
+                    }
+                }
+                self.gh = GhState::Loading;
+                self.ensure_gh_stats();
+                self.ensure_pkg_detail();
             }
             _ => {}
         }

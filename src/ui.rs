@@ -62,9 +62,16 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
     let p = pal(app);
     // ── Left: logo ────────────────────────────────────────────────────────────
     let accent = accent(app);
-    let count = if app.loading {
-        " fetching… ".to_string()
-    } else if app.page > 1 {
+    // ── Cache badge: colore + label in base allo stato ────────────────────
+    let (badge_label, badge_color) = if app.loading {
+        (" ⟳ fetching… ", Color::Rgb(90, 88, 110)) // dim
+    } else if app.from_cache {
+        (" ◎ cached ", Color::Rgb(241, 250, 140)) // giallo
+    } else {
+        (" ● live ", Color::Rgb(80, 250, 123)) // verde
+    };
+
+    let page_label = if app.page > 1 {
         format!(" {} pkgs · p.{} ", app.packages.len(), app.page)
     } else {
         format!(" {} pkgs ", app.packages.len())
@@ -77,7 +84,10 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
             Span::styled(" ✦ ", Style::new().fg(accent)),
             Span::styled("hexplorer", Style::new().fg(p.white).bold()),
         ]))
-        .title_bottom(Span::styled(count, Style::new().fg(accent)));
+        .title_bottom(Line::from(vec![
+            Span::styled(page_label, Style::new().fg(accent)),
+            Span::styled(badge_label, Style::new().fg(badge_color).bold()),
+        ]));
     f.render_widget(logo_block, left);
 
     // ── Center: language tab bar ──────────────────────────────────────────────
@@ -565,6 +575,33 @@ fn draw_detail_view(f: &mut Frame, app: &App, area: Rect) {
     }
     lines.push(Line::from(""));
 
+    // Versions
+    lines.push(section("versions", p.dim));
+    lines.push(Line::from(""));
+    if app.detail_loading {
+        lines.push(Line::from(Span::styled(
+            "  loading…",
+            Style::new().fg(p.dim).italic(),
+        )));
+    } else if pkg.versions.is_empty() {
+        lines.push(Line::from(Span::styled("  —", Style::new().fg(p.dim))));
+    } else {
+        // Show up to 10 most recent versions; they arrive newest-first from the API.
+        for v in pkg.versions.iter().take(10) {
+            lines.push(Line::from(vec![
+                Span::styled("  ", Style::new().fg(p.dim)),
+                Span::styled(v.clone(), Style::new().fg(p.white)),
+            ]));
+        }
+        if pkg.versions.len() > 10 {
+            lines.push(Line::from(Span::styled(
+                format!("  … and {} more", pkg.versions.len() - 10),
+                Style::new().fg(p.dim).italic(),
+            )));
+        }
+    }
+    lines.push(Line::from(""));
+
     // Metadata
     lines.push(section("metadata", p.dim));
     lines.push(Line::from(""));
@@ -846,7 +883,9 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
             Span::styled("tab", Style::new().fg(accent).bold()),
             Span::styled(" link  ", Style::new().fg(p.dim)),
             Span::styled("enter", Style::new().fg(accent).bold()),
-            Span::styled(" open", Style::new().fg(p.dim)),
+            Span::styled(" open  ", Style::new().fg(p.dim)),
+            Span::styled("r", Style::new().fg(p.green).bold()),
+            Span::styled(" refresh pkg", Style::new().fg(p.dim)),
         ],
         View::Settings => vec![
             Span::styled(" esc / q", Style::new().fg(SETTINGS_ACCENT).bold()),
