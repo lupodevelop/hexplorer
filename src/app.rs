@@ -312,6 +312,7 @@ impl App {
                 }
                 SettingRow::KeepWeeks => {}
                 SettingRow::ColorScheme => {}
+                SettingRow::DefaultLanguage => {}
             },
 
             // `d` on the token row clears it.
@@ -351,6 +352,18 @@ impl App {
                     self.settings_config.color_scheme.cycle()
                 };
                 self.color_scheme = self.settings_config.color_scheme;
+                self.persist_settings_config();
+            }
+
+            // ← / → cycle default language.
+            KeyCode::Left | KeyCode::Right
+                if rows.get(self.settings_cursor) == Some(&SettingRow::DefaultLanguage) =>
+            {
+                self.settings_config.default_language = if key.code == KeyCode::Left {
+                    self.settings_config.default_language.cycle_back()
+                } else {
+                    self.settings_config.default_language.cycle()
+                };
                 self.persist_settings_config();
             }
 
