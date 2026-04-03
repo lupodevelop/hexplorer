@@ -190,10 +190,19 @@ fn run_config(arg: Option<&str>) -> Result<()> {
             let token_display = storage::load_github_token()
                 .map(|t| mask_token(&t))
                 .unwrap_or_else(|| "(not set — falls back to GITHUB_TOKEN env var)".into());
-            println!("\n  retention  keep_weeks   = {}", meta.config.keep_weeks);
-            println!("  storage    compress     = {}", meta.config.compress);
-            println!("  github     token        = {}", token_display);
-            println!("             stored in    ~/.config/hexplorer/credentials.json (mode 0600)");
+            println!(
+                "\n  retention  keep_weeks       = {}",
+                meta.config.keep_weeks
+            );
+            println!("  storage    compress         = {}", meta.config.compress);
+            println!("  github     token            = {}", token_display);
+            println!(
+                "             stored in        ~/.config/hexplorer/credentials.json (mode 0600)"
+            );
+            println!(
+                "  app        default_language = {}",
+                meta.config.default_language
+            );
             println!();
         }
         Some(kv) => {
@@ -215,6 +224,14 @@ fn run_config(arg: Option<&str>) -> Result<()> {
                     storage::save_meta(&meta)?;
                     println!("compress set to {}", meta.config.compress);
                 }
+                "default_language" => {
+                    meta.config.default_language = val
+                        .trim()
+                        .parse()
+                        .map_err(|e: String| anyhow::anyhow!(e))?;
+                    storage::save_meta(&meta)?;
+                    println!("default_language set to {}", meta.config.default_language);
+                }
                 "github_token" => {
                     let t = val.trim();
                     storage::save_github_token(if t.is_empty() { None } else { Some(t) })?;
@@ -229,7 +246,7 @@ fn run_config(arg: Option<&str>) -> Result<()> {
                     return Ok(()); // meta unchanged, skip save_meta below
                 }
                 other => anyhow::bail!(
-                    "unknown config key: '{other}' (valid: keep_weeks, compress, github_token)"
+                    "unknown config key: '{other}' (valid: keep_weeks, compress, default_language, github_token)"
                 ),
             }
         }

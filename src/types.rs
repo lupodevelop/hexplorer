@@ -220,10 +220,11 @@ pub enum View {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SettingRow {
     GithubToken,
+    ColorScheme,
+    DefaultLanguage,
     KeepWeeks,
     Compress,
     ClearGhCache,
-    ColorScheme,
 }
 
 impl SettingRow {
@@ -231,6 +232,7 @@ impl SettingRow {
         &[
             Self::GithubToken,
             Self::ColorScheme,
+            Self::DefaultLanguage,
             Self::KeepWeeks,
             Self::Compress,
             Self::ClearGhCache,

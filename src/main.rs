@@ -1,7 +1,7 @@
 //! hexplorer — BEAM ecosystem explorer for HEX.pm
 //!
 //! Usage:
-//!   hexplorer                                    # interactive TUI (Gleam by default)
+//!   hexplorer                                    # interactive TUI (uses configured default_language)
 //!   hexplorer --lang elixir                      # TUI starting on Elixir tab
 //!   hexplorer --output json                      # JSON snapshot to stdout
 //!   hexplorer --output compact --lang gleam      # Markdown table to stdout
@@ -39,11 +39,18 @@ use args::Args;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let args = args::parse_args()?;
+    let mut args = args::parse_args()?;
 
     // 1. Storage subcommand — sync, no TUI.
     if let Some(cmd) = args.storage_cmd {
         return storage_cmd::run(cmd);
+    }
+
+    // Apply config default_language when --lang was not passed explicitly.
+    if !args.lang_explicit {
+        if let Ok(meta) = storage::load_meta() {
+            args.language = meta.config.default_language;
+        }
     }
 
     // 2. Output mode — async fetch, no TUI.

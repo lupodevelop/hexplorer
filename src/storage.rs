@@ -66,6 +66,9 @@ pub struct StorageConfig {
     /// UI color scheme. Defaults to `Default` (original dark purple theme).
     #[serde(default)]
     pub color_scheme: ColorScheme,
+    /// Language to open when `--lang` is not passed on the CLI.
+    #[serde(default)]
+    pub default_language: Language,
 }
 
 impl Default for StorageConfig {
@@ -74,6 +77,7 @@ impl Default for StorageConfig {
             keep_weeks: 12,
             compress: false,
             color_scheme: ColorScheme::Default,
+            default_language: Language::default(),
         }
     }
 }
