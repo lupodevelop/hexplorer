@@ -197,6 +197,10 @@ impl App {
 
         // Serve from session cache when available.
         if let Some((pkgs, more)) = self.pkg_cache.get(&key) {
+            // Increment fetch_gen even on cache hits to invalidate any in-flight
+            // async fetches spawned for a previous language/sort/page combination.
+            // Without this, a stale Msg::Loaded can overwrite the cached result.
+            self.fetch_gen += 1;
             self.packages = pkgs.clone();
             self.has_more = *more;
             self.from_cache = true;
@@ -287,7 +291,10 @@ impl App {
             Msg::Loaded(gen, pkgs, more) => {
                 // Discard results from superseded fetches (e.g. rapid sort/language changes).
                 if gen != self.fetch_gen {
-                    debug!("[msg] Loaded gen={gen} discarded (current={})", self.fetch_gen);
+                    debug!(
+                        "[msg] Loaded gen={gen} discarded (current={})",
+                        self.fetch_gen
+                    );
                     return;
                 }
                 info!(
@@ -314,7 +321,10 @@ impl App {
                 self.pkg_cache.insert(key, (pkgs, more));
             }
             Msg::DetailLoaded(name, versions) => {
-                info!("[msg] DetailLoaded pkg={name:?} versions={}", versions.len());
+                info!(
+                    "[msg] DetailLoaded pkg={name:?} versions={}",
+                    versions.len()
+                );
                 self.detail_loading = false;
                 // Patch the matching package in-place so the detail view updates live.
                 if let Some(pkg) = self.packages.iter_mut().find(|p| p.name == name) {
@@ -322,7 +332,10 @@ impl App {
                 }
             }
             Msg::DocsSearchLoaded(term, results) => {
-                info!("[msg] DocsSearchLoaded query={term:?} results={}", results.len());
+                info!(
+                    "[msg] DocsSearchLoaded query={term:?} results={}",
+                    results.len()
+                );
                 self.docs_search_loading = false;
                 self.docs_search_results = results;
                 self.docs_search_cursor = 0;

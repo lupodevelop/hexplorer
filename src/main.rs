@@ -104,14 +104,20 @@ fn log_system_info() {
     let mut sys = System::new_all();
     sys.refresh_all();
 
-    let os_name = sys.name().unwrap_or_else(|| std::env::consts::OS.to_string());
+    let os_name = sys
+        .name()
+        .unwrap_or_else(|| std::env::consts::OS.to_string());
     let os_version = sys
         .long_os_version()
         .or_else(|| sys.os_version())
         .unwrap_or_default();
     let kernel_version = sys.kernel_version().unwrap_or_default();
     let host_name = sys.host_name().unwrap_or_default();
-    let cpu_brand = sys.cpus().first().map(|cpu| cpu.brand()).unwrap_or_default();
+    let cpu_brand = sys
+        .cpus()
+        .first()
+        .map(|cpu| cpu.brand())
+        .unwrap_or_default();
     let cpu_count = sys.cpus().len();
     let total_mem_mb = sys.total_memory() / (1024 * 1024);
     let free_mem_mb = sys.available_memory() / (1024 * 1024);

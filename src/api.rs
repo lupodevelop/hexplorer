@@ -248,7 +248,10 @@ pub fn github_token() -> Option<String> {
 async fn fetch_page(search: &str, sort: &str, page: u32) -> Result<Vec<Package>> {
     let page_str = page.to_string();
     let url = "https://hex.pm/api/packages";
-    info!("[fetch] fetch_page search={} sort={} page={} url={} ", search, sort, page, url);
+    info!(
+        "[fetch] fetch_page search={} sort={} page={} url={} ",
+        search, sort, page, url
+    );
 
     let resp = client()?
         .get(url)
@@ -268,11 +271,16 @@ async fn fetch_page(search: &str, sort: &str, page: u32) -> Result<Vec<Package>>
         let snippet: String = body.lines().take(8).collect::<Vec<_>>().join("\n");
         error!("[fetch] fetch_page failed: {} {}\n{}", status, url, snippet);
     } else {
-        debug!("[fetch] fetch_page response: {} {} body_len={}", status, url, body.len());
+        debug!(
+            "[fetch] fetch_page response: {} {} body_len={}",
+            status,
+            url,
+            body.len()
+        );
     }
 
-    let raw: Vec<HexRaw> = serde_json::from_str(&body)
-        .context("parsing hex.pm package list response")?;
+    let raw: Vec<HexRaw> =
+        serde_json::from_str(&body).context("parsing hex.pm package list response")?;
     Ok(raw.into_iter().map(into_package).collect())
 }
 
@@ -312,7 +320,10 @@ pub async fn fetch_packages(
     page: u32,
 ) -> Result<(Vec<Package>, bool)> {
     let q = query.trim();
-    info!("[fetch] fetch_packages language={} query={q} sort={sort} page={page}", language);
+    info!(
+        "[fetch] fetch_packages language={} query={q} sort={sort} page={page}",
+        language
+    );
 
     if language == Language::All {
         info!("[fetch] All BEAM mode: fetching gleam/mix/rebar3 buckets");
@@ -417,9 +428,17 @@ pub async fn fetch_package(name: &str) -> Result<Package> {
 
     if !status.is_success() {
         let snippet: String = body.lines().take(8).collect::<Vec<_>>().join("\n");
-        error!("[fetch] fetch_package failed: {} {}\n{}", status, url, snippet);
+        error!(
+            "[fetch] fetch_package failed: {} {}\n{}",
+            status, url, snippet
+        );
     } else {
-        debug!("[fetch] fetch_package response: {} {} body_len={}", status, url, body.len());
+        debug!(
+            "[fetch] fetch_package response: {} {} body_len={}",
+            status,
+            url,
+            body.len()
+        );
     }
 
     let raw: HexRaw = serde_json::from_str(&body).context("parsing hex.pm package response")?;
@@ -475,7 +494,11 @@ pub async fn fetch_github_stats(repo_url: &str, token: Option<&str>) -> Result<G
     }
 
     let url = format!("https://api.github.com/repos/{owner}/{repo}");
-    info!("[github] fetch_github_stats url={} token_present={}", url, token.is_some());
+    info!(
+        "[github] fetch_github_stats url={} token_present={}",
+        url,
+        token.is_some()
+    );
 
     let mut req = client()?
         .get(url.clone())
@@ -491,9 +514,17 @@ pub async fn fetch_github_stats(repo_url: &str, token: Option<&str>) -> Result<G
 
     if !status.is_success() {
         let snippet: String = body.lines().take(8).collect::<Vec<_>>().join("\n");
-        error!("[github] fetch_github_stats failed: {} {}\n{}", status, url, snippet);
+        error!(
+            "[github] fetch_github_stats failed: {} {}\n{}",
+            status, url, snippet
+        );
     } else {
-        debug!("[github] fetch_github_stats response: {} {} body_len={}", status, url, body.len());
+        debug!(
+            "[github] fetch_github_stats response: {} {} body_len={}",
+            status,
+            url,
+            body.len()
+        );
     }
 
     match status.as_u16() {
@@ -532,8 +563,14 @@ pub async fn fetch_docs_search_data(package: &str) -> Result<Vec<SearchItem>> {
         } else {
             let status = r.status();
             let body = r.text().await.unwrap_or_default();
-            error!("[docs] docs search underscore failed: {} {}", status, url_underscore);
-            error!("[docs] docs search underscore body: {}", body.lines().take(8).collect::<Vec<_>>().join("\n"));
+            error!(
+                "[docs] docs search underscore failed: {} {}",
+                status, url_underscore
+            );
+            error!(
+                "[docs] docs search underscore body: {}",
+                body.lines().take(8).collect::<Vec<_>>().join("\n")
+            );
 
             let r2 = c.get(&url_hyphen).send().await?;
             let url2 = r2.url().clone();
@@ -541,8 +578,13 @@ pub async fn fetch_docs_search_data(package: &str) -> Result<Vec<SearchItem>> {
                 let status2 = r2.status();
                 let body2 = r2.text().await.unwrap_or_default();
                 error!("[docs] docs search hyphen failed: {} {}", status2, url2);
-                error!("[docs] docs search hyphen body: {}", body2.lines().take(8).collect::<Vec<_>>().join("\n"));
-                return Err(anyhow::anyhow!("docs search failed for both underscore and hyphen variants"));
+                error!(
+                    "[docs] docs search hyphen body: {}",
+                    body2.lines().take(8).collect::<Vec<_>>().join("\n")
+                );
+                return Err(anyhow::anyhow!(
+                    "docs search failed for both underscore and hyphen variants"
+                ));
             }
             debug!("[docs] docs search fetched hyphen url={}", url2);
             r2
@@ -552,7 +594,12 @@ pub async fn fetch_docs_search_data(package: &str) -> Result<Vec<SearchItem>> {
     let url = resp.url().clone();
     let status = resp.status();
     let body = resp.text().await?;
-    debug!("[docs] docs search response {} {} body_len={}", status, url, body.len());
+    debug!(
+        "[docs] docs search response {} {} body_len={}",
+        status,
+        url,
+        body.len()
+    );
     let data: SearchData = serde_json::from_str(&body).context("parsing docs search response")?;
     Ok(data
         .items
