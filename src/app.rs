@@ -197,6 +197,10 @@ impl App {
 
         // Serve from session cache when available.
         if let Some((pkgs, more)) = self.pkg_cache.get(&key) {
+            // Increment fetch_gen even on cache hits to invalidate any in-flight
+            // async fetches spawned for a previous language/sort/page combination.
+            // Without this, a stale Msg::Loaded can overwrite the cached result.
+            self.fetch_gen += 1;
             self.packages = pkgs.clone();
             self.has_more = *more;
             self.from_cache = true;

@@ -19,6 +19,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Detail view `r` key now force-refreshes both GitHub stats and version history for the current package.
 
+### Fixed
+
+- **Stale language list after cycling with `l`** — when scrolling through languages and the target language was served from the session cache, a still-in-flight async fetch for the previous language could arrive later and overwrite the visible package list with wrong results (typically All BEAM). Fixed by incrementing `fetch_gen` on cache hits as well, so any in-flight task is invalidated immediately.
+
 ## [0.1.3] — 2026-04-03
 
 ### Added
