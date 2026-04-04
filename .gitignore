@@ -39,3 +39,6 @@ yarn-error.log*
 *.tmp
 *.temp
 
+# developer-specific files
+dev_notes/
+
