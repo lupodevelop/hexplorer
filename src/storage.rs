@@ -33,6 +33,12 @@ fn snapshots_dir() -> Result<PathBuf> {
     Ok(dir)
 }
 
+pub fn logs_dir() -> Result<PathBuf> {
+    let dir = cache_dir()?.join("logs");
+    fs::create_dir_all(&dir).context("creating logs dir")?;
+    Ok(dir)
+}
+
 fn snapshot_filename(lang: Language, date: &str) -> String {
     format!("{lang}_{date}.json")
 }
@@ -75,6 +81,9 @@ pub struct StorageConfig {
     /// How many hours to keep docs search index on disk. 0 = disable disk cache.
     #[serde(default = "default_docs_cache_ttl_hours")]
     pub docs_cache_ttl_hours: u32,
+    /// How many days to keep log files under `~/.cache/hexplorer/logs`.
+    #[serde(default = "default_log_retention_days")]
+    pub log_retention_days: u32,
 }
 
 fn default_docs_cache_ttl_hours() -> u32 {
@@ -90,8 +99,13 @@ impl Default for StorageConfig {
             default_language: Language::default(),
             link_style: LinkStyle::default(),
             docs_cache_ttl_hours: default_docs_cache_ttl_hours(),
+            log_retention_days: default_log_retention_days(),
         }
     }
+}
+
+fn default_log_retention_days() -> u32 {
+    7
 }
 
 // ── Credentials ───────────────────────────────────────────────────────────────
@@ -273,6 +287,33 @@ pub fn prune_all(keep_weeks: u32) -> Result<Vec<PathBuf>> {
         all.extend(prune(lang, keep_weeks)?);
     }
     Ok(all)
+}
+
+pub fn cleanup_logs(retention_days: u32) -> Result<()> {
+    if retention_days == 0 {
+        return Ok(());
+    }
+
+    let cutoff = chrono::Local::now().date_naive() - chrono::Duration::days(retention_days as i64);
+    let dir = logs_dir()?;
+
+    for entry in std::fs::read_dir(&dir).context("reading logs dir")? {
+        let entry = entry.context("reading log file entry")?;
+        let path = entry.path();
+        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+            if let Some(date_part) = name.strip_prefix("hexplorer-") {
+                if let Some(date_part) = date_part.strip_suffix(".log") {
+                    if let Ok(date) = chrono::NaiveDate::parse_from_str(date_part, "%Y%m%d") {
+                        if date < cutoff {
+                            std::fs::remove_file(&path)
+                                .with_context(|| format!("removing old log file {:?}", path))?;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 // ── Status ────────────────────────────────────────────────────────────────────
