@@ -8,8 +8,8 @@ use std::collections::HashMap;
 
 use crate::{
     api::{
-        fetch_by_names, fetch_github_stats, fetch_package, fetch_packages, github_token, GhResult,
-        Package,
+        fetch_by_names, fetch_docs_search_data, fetch_github_stats, fetch_package, fetch_packages,
+        github_token, GhResult, Package, SearchItem,
     },
     cache::{self, CacheMap, CachedEntry},
     favorites,
@@ -53,6 +53,8 @@ pub enum Msg {
     GhFetched(String, GhResult), // (repo_url, result)
     /// Single-package detail fetch result: (package_name, versions_newest_first).
     DetailLoaded(String, Vec<String>),
+    /// HexDocs search index fetch result: (query_term, filtered_results).
+    DocsSearchLoaded(String, Vec<SearchItem>),
     Err(String),
 }
 
@@ -108,6 +110,22 @@ pub struct App {
     pub from_cache: bool,
     /// True while a single-package detail fetch is in flight.
     pub detail_loading: bool,
+    /// True while the user is typing a HexDocs search query.
+    pub docs_search_mode: bool,
+    /// Buffer for the HexDocs search query being typed.
+    pub docs_search_input: String,
+    /// True while the search_data.json fetch is in flight.
+    pub docs_search_loading: bool,
+    /// Results from the last HexDocs search, filtered locally.
+    pub docs_search_results: Vec<SearchItem>,
+    /// Cursor index into `docs_search_results`.
+    pub docs_search_cursor: usize,
+    /// Package name whose docs are being searched (for building open URLs).
+    pub docs_search_pkg: String,
+    /// View to return to when closing DocsSearch (List or Detail).
+    prev_view: View,
+    /// Active docs cache TTL in hours — mirrors settings_config, loaded at startup.
+    pub docs_cache_ttl_hours: u32,
     tx: Sender<Msg>,
     /// Monotonically-increasing counter; each `load()` call increments it.
     /// `Msg::Loaded` carries the generation it was spawned with — results from
@@ -151,6 +169,16 @@ impl App {
             pkg_cache: std::collections::HashMap::new(),
             from_cache: false,
             detail_loading: false,
+            docs_search_mode: false,
+            docs_search_input: String::new(),
+            docs_search_loading: false,
+            docs_search_results: vec![],
+            docs_search_cursor: 0,
+            docs_search_pkg: String::new(),
+            prev_view: View::List,
+            docs_cache_ttl_hours: storage::load_meta()
+                .map(|m| m.config.docs_cache_ttl_hours)
+                .unwrap_or(24),
             tx,
             fetch_gen: 0,
         }
@@ -282,6 +310,11 @@ impl App {
                     pkg.versions = versions;
                 }
             }
+            Msg::DocsSearchLoaded(_term, results) => {
+                self.docs_search_loading = false;
+                self.docs_search_results = results;
+                self.docs_search_cursor = 0;
+            }
             Msg::GhFetched(repo_url, result) => match result {
                 GhResult::Ok(stats) => {
                     cache::insert(&mut self.cache, repo_url, &stats);
@@ -397,11 +430,13 @@ impl App {
                     if let Ok(dir) = storage::cache_dir() {
                         let _ = std::fs::remove_file(dir.join("gh_stats.json"));
                     }
+                    cache::clear_docs();
                 }
                 SettingRow::KeepWeeks => {}
                 SettingRow::ColorScheme => {}
                 SettingRow::LinkStyle => {}
                 SettingRow::DefaultLanguage => {}
+                SettingRow::DocsCacheTtl => {}
             },
 
             // `d` on the token row clears it.
@@ -466,6 +501,25 @@ impl App {
                 } else {
                     self.settings_config.default_language.cycle()
                 };
+                self.persist_settings_config();
+            }
+
+            // ← / → cycle docs cache TTL through presets.
+            KeyCode::Left | KeyCode::Right
+                if rows.get(self.settings_cursor) == Some(&SettingRow::DocsCacheTtl) =>
+            {
+                const PRESETS: &[u32] = &[0, 1, 6, 12, 24, 48, 168];
+                let pos = PRESETS
+                    .iter()
+                    .position(|&h| h == self.settings_config.docs_cache_ttl_hours);
+                let cur = pos.unwrap_or(4); // default to 24h slot
+                let next = if key.code == KeyCode::Left {
+                    cur.saturating_sub(1)
+                } else {
+                    (cur + 1).min(PRESETS.len() - 1)
+                };
+                self.settings_config.docs_cache_ttl_hours = PRESETS[next];
+                self.docs_cache_ttl_hours = PRESETS[next];
                 self.persist_settings_config();
             }
 
@@ -602,10 +656,129 @@ impl App {
         }
     }
 
+    // ── HexDocs search ────────────────────────────────────────────────────────
+
+    fn open_docs_search(&mut self) {
+        let term = self.docs_search_input.trim().to_string();
+        if term.is_empty() {
+            return;
+        }
+        let Some(pkg_name) = self.selected().map(|p| p.name.clone()) else {
+            return;
+        };
+        self.docs_search_pkg = pkg_name.clone();
+        self.prev_view = self.view;
+        self.view = View::DocsSearch;
+        self.docs_search_results.clear();
+        self.docs_search_cursor = 0;
+
+        // Serve from disk cache if available and TTL not expired.
+        let ttl = self.docs_cache_ttl_hours;
+        if let Some(cached_items) = cache::get_docs(&pkg_name, ttl) {
+            let q = term.to_lowercase();
+            self.docs_search_results = cached_items
+                .into_iter()
+                .filter(|item| {
+                    item.title.to_lowercase().contains(&q)
+                        || item.doc_text.to_lowercase().contains(&q)
+                })
+                .take(50)
+                .collect();
+            self.docs_search_loading = false;
+            return;
+        }
+
+        self.docs_search_loading = true;
+        let tx = self.tx.clone();
+        tokio::spawn(async move {
+            match fetch_docs_search_data(&pkg_name).await {
+                Ok(items) => {
+                    cache::insert_docs(&pkg_name, &items, ttl);
+                    let q = term.to_lowercase();
+                    let results = items
+                        .into_iter()
+                        .filter(|item| {
+                            item.title.to_lowercase().contains(&q)
+                                || item.doc_text.to_lowercase().contains(&q)
+                        })
+                        .take(50)
+                        .collect();
+                    let _ = tx.send(Msg::DocsSearchLoaded(term, results)).await;
+                }
+                Err(_) => {
+                    let _ = tx.send(Msg::DocsSearchLoaded(term, vec![])).await;
+                }
+            }
+        });
+    }
+
+    fn key_docs_search_view(&mut self, key: KeyEvent) -> bool {
+        match key.code {
+            KeyCode::Char('q') | KeyCode::Esc => {
+                self.view = self.prev_view;
+                self.docs_search_results.clear();
+            }
+            KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => return true,
+            KeyCode::Down | KeyCode::Char('j') => {
+                if !self.docs_search_results.is_empty() {
+                    self.docs_search_cursor = (self.docs_search_cursor + 1)
+                        .min(self.docs_search_results.len() - 1);
+                }
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                self.docs_search_cursor = self.docs_search_cursor.saturating_sub(1);
+            }
+            KeyCode::Enter => {
+                if let Some(item) = self.docs_search_results.get(self.docs_search_cursor) {
+                    let url = format!(
+                        "https://hexdocs.pm/{}/{}",
+                        self.docs_search_pkg, item.ref_url
+                    );
+                    let _ = open::that(url);
+                }
+            }
+            _ => {}
+        }
+        false
+    }
+
+    fn key_docs_search(&mut self, key: KeyEvent) -> bool {
+        match key.code {
+            KeyCode::Esc => {
+                self.docs_search_mode = false;
+                self.docs_search_input.clear();
+            }
+            KeyCode::Enter => {
+                self.open_docs_search();
+                self.docs_search_mode = false;
+                self.docs_search_input.clear();
+            }
+            KeyCode::Backspace if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                delete_word_back(&mut self.docs_search_input);
+            }
+            KeyCode::Char('w') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                delete_word_back(&mut self.docs_search_input);
+            }
+            KeyCode::Backspace => {
+                self.docs_search_input.pop();
+            }
+            KeyCode::Char(c) => {
+                if self.docs_search_input.len() < 200 {
+                    self.docs_search_input.push(c);
+                }
+            }
+            _ => {}
+        }
+        false
+    }
+
     // ── Key handling ──────────────────────────────────────────────────────────
 
     /// Returns `true` when the app should quit.
     pub fn on_key(&mut self, key: KeyEvent) -> bool {
+        if self.docs_search_mode {
+            return self.key_docs_search(key);
+        }
         if self.input_mode {
             return self.key_input(key);
         }
@@ -613,6 +786,7 @@ impl App {
             View::List => self.key_list(key),
             View::Detail => self.key_detail(key),
             View::Settings => self.key_settings(key),
+            View::DocsSearch => self.key_docs_search_view(key),
         }
     }
 
@@ -649,6 +823,10 @@ impl App {
         match key.code {
             KeyCode::Char('q') => return true,
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => return true,
+            KeyCode::Char('D') if !self.packages.is_empty() => {
+                self.docs_search_mode = true;
+                self.docs_search_input.clear();
+            }
 
             KeyCode::Char('/') => {
                 self.input_mode = true;
@@ -765,6 +943,10 @@ impl App {
                         let _ = open::that(url);
                     }
                 }
+            }
+            KeyCode::Char('s') => {
+                self.docs_search_mode = true;
+                self.docs_search_input.clear();
             }
             // `r` — force-refresh GH stats + detail for the current package.
             KeyCode::Char('r') => {
