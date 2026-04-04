@@ -1,5 +1,7 @@
 //! Application state and event handling.
 
+use log::{debug, error, info, warn};
+
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::widgets::ListState;
 use tokio::sync::mpsc::Sender;
@@ -285,8 +287,19 @@ impl App {
             Msg::Loaded(gen, pkgs, more) => {
                 // Discard results from superseded fetches (e.g. rapid sort/language changes).
                 if gen != self.fetch_gen {
+                    debug!(
+                        "[msg] Loaded gen={gen} discarded (current={})",
+                        self.fetch_gen
+                    );
                     return;
                 }
+                info!(
+                    "[msg] Loaded gen={gen} packages={} has_more={more} lang={} query={:?} page={}",
+                    pkgs.len(),
+                    self.language,
+                    self.input.trim(),
+                    self.page,
+                );
                 self.loading = false;
                 self.from_cache = false;
                 self.has_more = more;
@@ -304,33 +317,48 @@ impl App {
                 self.pkg_cache.insert(key, (pkgs, more));
             }
             Msg::DetailLoaded(name, versions) => {
+                info!(
+                    "[msg] DetailLoaded pkg={name:?} versions={}",
+                    versions.len()
+                );
                 self.detail_loading = false;
                 // Patch the matching package in-place so the detail view updates live.
                 if let Some(pkg) = self.packages.iter_mut().find(|p| p.name == name) {
                     pkg.versions = versions;
                 }
             }
-            Msg::DocsSearchLoaded(_term, results) => {
+            Msg::DocsSearchLoaded(term, results) => {
+                info!(
+                    "[msg] DocsSearchLoaded query={term:?} results={}",
+                    results.len()
+                );
                 self.docs_search_loading = false;
                 self.docs_search_results = results;
                 self.docs_search_cursor = 0;
             }
-            Msg::GhFetched(repo_url, result) => match result {
-                GhResult::Ok(stats) => {
-                    cache::insert(&mut self.cache, repo_url, &stats);
-                    self.gh = GhState::Live(stats);
+            Msg::GhFetched(repo_url, result) => {
+                let result_label = match &result {
+                    GhResult::Ok(_) => "ok",
+                    GhResult::RateLimited => "rate_limited",
+                    GhResult::BadToken => "bad_token",
+                    GhResult::Unavailable => "unavailable",
+                };
+                info!("[msg] GhFetched repo={repo_url:?} result={result_label}");
+                if matches!(result, GhResult::BadToken) {
+                    warn!("[msg] GhFetched bad_token — stored/env token is invalid or expired");
                 }
-                GhResult::RateLimited => {
-                    self.gh = GhState::RateLimited;
+                match result {
+                    GhResult::Ok(stats) => {
+                        cache::insert(&mut self.cache, repo_url, &stats);
+                        self.gh = GhState::Live(stats);
+                    }
+                    GhResult::RateLimited => self.gh = GhState::RateLimited,
+                    GhResult::BadToken => self.gh = GhState::BadToken,
+                    GhResult::Unavailable => self.gh = GhState::Unavailable,
                 }
-                GhResult::BadToken => {
-                    self.gh = GhState::BadToken;
-                }
-                GhResult::Unavailable => {
-                    self.gh = GhState::Unavailable;
-                }
-            },
+            }
             Msg::Err(e) => {
+                error!("[msg] Err: {e}");
                 self.loading = false;
                 self.error = Some(e);
             }
@@ -776,18 +804,27 @@ impl App {
 
     /// Returns `true` when the app should quit.
     pub fn on_key(&mut self, key: KeyEvent) -> bool {
+        debug!(
+            "[key] code={:?} modifiers={:?} view={:?} input_mode={} docs_search_mode={}",
+            key.code, key.modifiers, self.view, self.input_mode, self.docs_search_mode,
+        );
+        let prev_view = self.view;
         if self.docs_search_mode {
             return self.key_docs_search(key);
         }
         if self.input_mode {
             return self.key_input(key);
         }
-        match self.view {
+        let quit = match self.view {
             View::List => self.key_list(key),
             View::Detail => self.key_detail(key),
             View::Settings => self.key_settings(key),
             View::DocsSearch => self.key_docs_search_view(key),
+        };
+        if self.view != prev_view {
+            info!("[view] {:?} → {:?}", prev_view, self.view);
         }
+        quit
     }
 
     fn key_input(&mut self, key: KeyEvent) -> bool {

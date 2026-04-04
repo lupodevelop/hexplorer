@@ -27,6 +27,8 @@ pub struct Args {
     pub sort: Sort,
     /// Package name for `--output detail <name>`.
     pub package: Option<String>,
+    /// Optional path to write a diagnostics log file.
+    pub log_file: Option<String>,
     /// Present when the first positional arg is `storage`.
     pub storage_cmd: Option<StorageSubcmd>,
 }
@@ -91,6 +93,12 @@ pub fn parse_from(raw: &[String]) -> anyhow::Result<Args> {
                     .get(i)
                     .ok_or_else(|| anyhow::anyhow!("--sort requires a value"))?;
                 args.sort = s.parse().map_err(|e: String| anyhow::anyhow!(e))?;
+            }
+            "--log-file" | "-L" => {
+                i += 1;
+                if let Some(path) = raw.get(i) {
+                    args.log_file = Some(path.clone());
+                }
             }
             _ => {} // Forward-compatible: ignore unknown flags.
         }

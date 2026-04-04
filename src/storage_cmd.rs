@@ -49,6 +49,7 @@ fn run_status() -> Result<()> {
 
     println!();
     println!("  retention policy : {} weeks", s.config.keep_weeks);
+    println!("  log retention    : {} days", s.config.log_retention_days);
     if let Some(p) = &meta.last_prune {
         println!("  last prune       : {}", &p[..10]);
     } else {
@@ -203,6 +204,10 @@ fn run_config(arg: Option<&str>) -> Result<()> {
                 "  app        default_language = {}",
                 meta.config.default_language
             );
+            println!(
+                "  app        log_retention_days = {}",
+                meta.config.log_retention_days
+            );
             println!();
         }
         Some(kv) => {
@@ -232,6 +237,14 @@ fn run_config(arg: Option<&str>) -> Result<()> {
                     storage::save_meta(&meta)?;
                     println!("default_language set to {}", meta.config.default_language);
                 }
+                "log_retention_days" => {
+                    meta.config.log_retention_days = val
+                        .trim()
+                        .parse()
+                        .map_err(|_| anyhow::anyhow!("log_retention_days must be an integer"))?;
+                    storage::save_meta(&meta)?;
+                    println!("log_retention_days set to {}", meta.config.log_retention_days);
+                }
                 "github_token" => {
                     let t = val.trim();
                     storage::save_github_token(if t.is_empty() { None } else { Some(t) })?;
@@ -246,7 +259,7 @@ fn run_config(arg: Option<&str>) -> Result<()> {
                     return Ok(()); // meta unchanged, skip save_meta below
                 }
                 other => anyhow::bail!(
-                    "unknown config key: '{other}' (valid: keep_weeks, compress, default_language, github_token)"
+                    "unknown config key: '{other}' (valid: keep_weeks, compress, default_language, log_retention_days, github_token)"
                 ),
             }
         }

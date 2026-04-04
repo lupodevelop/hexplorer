@@ -12,6 +12,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Session cache for package listings** — navigation between pages, sort changes, and language switches no longer trigger redundant HTTP requests within the same session. The cache is keyed on `(query, sort, language, page)` and cleared on manual refresh (`r`).
 - **Package version history in detail view** — opening a package detail now fetches the full release list from `GET /api/packages/{name}` in the background. Up to 10 most-recent versions are shown in a new `versions` section; the list updates live when the fetch completes.
 - **`(cached)` indicator in header** — when a listing is served from the session cache, the package count badge shows `(cached)`.
+- **Diagnostics logging** — hexplorer writes a daily log file to `~/.cache/hexplorer/logs/hexplorer-YYYYMMDD.log` (via `log` + `simplelog`). Covers startup args, system info (OS, CPU, RAM via `sysinfo`), key events, view transitions, async message flow (fetch gen, result counts), all API calls with status codes, and errors. Pass `--log-file <path>` to write to a custom location.
+- **Log retention** — log files older than the configured window are pruned automatically at startup. Default is 7 days. Configure via `hexplorer storage config log_retention_days=N` (`0` disables pruning).
 
 ### Changed
 
