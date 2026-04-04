@@ -74,6 +74,9 @@ hexplorer storage config keep_weeks=4             # set snapshot retention
 hexplorer storage config default_language=elixir  # set startup language (gleam/elixir/erlang/all)
 hexplorer storage config github_token=ghp_...    # store GitHub token persistently
 hexplorer storage config github_token=           # remove stored token
+hexplorer storage config log_retention_days=14   # keep logs for 14 days (0 = disable)
+
+hexplorer --log-file /tmp/hexplorer.log          # write diagnostics to a custom path
 ```
 
 ## Keyboard shortcuts
@@ -168,6 +171,31 @@ Results show the item type (`value`, `module`, `page`, `type`, `callback`), titl
 
 The search index is cached to disk (default 24h TTL). Configure the TTL via `?` → settings → `docs cache`.
 
+## Diagnostics logging
+
+hexplorer writes a daily log file to:
+
+```
+~/.cache/hexplorer/logs/hexplorer-YYYYMMDD.log
+```
+
+Logs cover startup arguments and config, system information (OS, CPU, RAM), every key event with current view, view transitions, async message flow (fetch gen, result counts), all API requests with status codes, and errors. They are useful for diagnosing rendering or fetch issues.
+
+Log files are pruned automatically at startup. Default retention is **7 days**. Change it:
+
+```sh
+hexplorer storage config log_retention_days=14   # keep 14 days
+hexplorer storage config log_retention_days=0    # disable pruning
+```
+
+To write to a custom path for a single session:
+
+```sh
+hexplorer --log-file /tmp/hexplorer-debug.log
+```
+
+Logs never include stored API credentials or GitHub tokens.
+
 ## Cache & snapshots
 
 All data lives under `~/.cache/hexplorer/`:
@@ -179,13 +207,16 @@ All data lives under `~/.cache/hexplorer/`:
 │   └── ...
 ├── favorites.json       Starred package names
 ├── gh_stats.json        GitHub stats (6h TTL, pruned at 42h)
+├── logs/                Daily diagnostics logs (7-day retention by default)
+│   └── hexplorer-20260404.log
 ├── meta.json            Config + digest timestamps
 └── snapshots/           Weekly package snapshots
     ├── gleam_20260322.json
     └── ...
 ```
 
-Default retention: **12 weeks**. Configure with `hexplorer storage config keep_weeks=N`.
+Snapshot retention: **12 weeks**. Configure with `hexplorer storage config keep_weeks=N`.
+Log retention: **7 days**. Configure with `hexplorer storage config log_retention_days=N`.
 Docs cache TTL: configurable via `?` → settings → `docs cache` (presets: off, 1h, 6h, 12h, 24h, 48h, 1 week).
 
 ## License
