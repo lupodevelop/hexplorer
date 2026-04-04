@@ -72,6 +72,13 @@ pub struct StorageConfig {
     /// How the selected link is highlighted in the detail view.
     #[serde(default)]
     pub link_style: LinkStyle,
+    /// How many hours to keep docs search index on disk. 0 = disable disk cache.
+    #[serde(default = "default_docs_cache_ttl_hours")]
+    pub docs_cache_ttl_hours: u32,
+}
+
+fn default_docs_cache_ttl_hours() -> u32 {
+    24
 }
 
 impl Default for StorageConfig {
@@ -82,6 +89,7 @@ impl Default for StorageConfig {
             color_scheme: ColorScheme::Default,
             default_language: Language::default(),
             link_style: LinkStyle::default(),
+            docs_cache_ttl_hours: default_docs_cache_ttl_hours(),
         }
     }
 }
