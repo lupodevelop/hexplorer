@@ -721,8 +721,8 @@ impl App {
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => return true,
             KeyCode::Down | KeyCode::Char('j') => {
                 if !self.docs_search_results.is_empty() {
-                    self.docs_search_cursor = (self.docs_search_cursor + 1)
-                        .min(self.docs_search_results.len() - 1);
+                    self.docs_search_cursor =
+                        (self.docs_search_cursor + 1).min(self.docs_search_results.len() - 1);
                 }
             }
             KeyCode::Up | KeyCode::Char('k') => {

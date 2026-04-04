@@ -151,7 +151,9 @@ pub fn insert_docs(package: &str, items: &[SearchItem], ttl_hours: u32) {
     if ttl_hours == 0 {
         return;
     }
-    let Some(path) = docs_cache_path(package) else { return };
+    let Some(path) = docs_cache_path(package) else {
+        return;
+    };
     if let Some(parent) = path.parent() {
         let _ = fs::create_dir_all(parent);
     }
@@ -166,6 +168,8 @@ pub fn insert_docs(package: &str, items: &[SearchItem], ttl_hours: u32) {
 
 /// Remove all cached docs files.
 pub fn clear_docs() {
-    let Some(dir) = dirs::cache_dir().map(|d| d.join("hexplorer").join("docs")) else { return };
+    let Some(dir) = dirs::cache_dir().map(|d| d.join("hexplorer").join("docs")) else {
+        return;
+    };
     let _ = fs::remove_dir_all(dir);
 }

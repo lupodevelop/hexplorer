@@ -477,7 +477,7 @@ pub async fn fetch_github_stats(repo_url: &str, token: Option<&str>) -> Result<G
 /// ExDoc has produced two filename variants across versions:
 /// - `search_data.json`  (underscore — older ExDoc)
 /// - `search-data.json`  (hyphen — newer ExDoc ≥ 1.14)
-/// We try the underscore variant first, then fall back to hyphen.
+///   We try the underscore variant first, then fall back to hyphen.
 pub async fn fetch_docs_search_data(package: &str) -> Result<Vec<SearchItem>> {
     let c = client()?;
     let url_underscore = format!("https://hexdocs.pm/{package}/search_data.json");

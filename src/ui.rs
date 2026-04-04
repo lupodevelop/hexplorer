@@ -805,7 +805,11 @@ fn draw_settings_view(f: &mut Frame, app: &App, area: Rect) {
 
     // docs_cache_ttl row
     let is_dct = rows[cursor] == SettingRow::DocsCacheTtl;
-    let (pre, col) = if is_dct { ("▶  ", ac) } else { ("   ", p.white) };
+    let (pre, col) = if is_dct {
+        ("▶  ", ac)
+    } else {
+        ("   ", p.white)
+    };
     let ttl_val = match app.settings_config.docs_cache_ttl_hours {
         0 => "off".to_string(),
         1 => "1h".to_string(),
@@ -873,8 +877,7 @@ fn draw_docs_search_view(f: &mut Frame, app: &App, area: Rect) {
 
     if app.docs_search_loading {
         f.render_widget(
-            Paragraph::new("\n  ⟳  searching hexdocs…")
-                .style(Style::new().fg(p.dim).italic()),
+            Paragraph::new("\n  ⟳  searching hexdocs…").style(Style::new().fg(p.dim).italic()),
             inner,
         );
         return;
@@ -889,11 +892,8 @@ fn draw_docs_search_view(f: &mut Frame, app: &App, area: Rect) {
     }
 
     // Split: list on top, doc snippet at bottom for selected item.
-    let [list_area, snippet_area] = Layout::vertical([
-        Constraint::Fill(1),
-        Constraint::Length(4),
-    ])
-    .areas(inner);
+    let [list_area, snippet_area] =
+        Layout::vertical([Constraint::Fill(1), Constraint::Length(4)]).areas(inner);
 
     // ── Results list ─────────────────────────────────────────────────────────
     let items: Vec<ListItem> = app
@@ -945,12 +945,25 @@ fn draw_docs_search_view(f: &mut Frame, app: &App, area: Rect) {
             });
         let url = format!("https://hexdocs.pm/{pkg}/{}", item.ref_url);
         let lines = vec![
-            Line::from(Span::styled("─".repeat(snippet_area.width as usize), Style::new().fg(p.dim))),
             Line::from(Span::styled(
-                format!("  {}", if snippet.is_empty() { "—".to_string() } else { snippet }),
+                "─".repeat(snippet_area.width as usize),
                 Style::new().fg(p.dim),
             )),
-            Line::from(Span::styled(format!("  {url}"), Style::new().fg(accent).underlined())),
+            Line::from(Span::styled(
+                format!(
+                    "  {}",
+                    if snippet.is_empty() {
+                        "—".to_string()
+                    } else {
+                        snippet
+                    }
+                ),
+                Style::new().fg(p.dim),
+            )),
+            Line::from(Span::styled(
+                format!("  {url}"),
+                Style::new().fg(accent).underlined(),
+            )),
         ];
         f.render_widget(Paragraph::new(lines), snippet_area);
     }
@@ -964,10 +977,7 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
 
     // Docs search modal overrides the footer while active.
     if app.docs_search_mode {
-        let pkg_name = app
-            .selected()
-            .map(|pkg| pkg.name.as_str())
-            .unwrap_or("?");
+        let pkg_name = app.selected().map(|pkg| pkg.name.as_str()).unwrap_or("?");
         let spans = vec![
             Span::styled(" Search ", Style::new().fg(p.dim)),
             Span::styled(pkg_name, Style::new().fg(accent).bold()),
