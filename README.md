@@ -94,6 +94,7 @@ hexplorer storage config github_token=           # remove stored token
 | `]` / `[` | Next / previous page (browse mode only) |
 | `s` | Star / unstar the selected package |
 | `f` | Toggle favorites view (shows all starred packages) |
+| `D` | Search HexDocs for the selected package |
 | `r` | Refresh |
 | `?` | Open settings |
 
@@ -106,7 +107,16 @@ hexplorer storage config github_token=           # remove stored token
 | `PgUp/Dn` | Fast scroll |
 | `Tab` / `Shift+Tab` | Cycle through available links (docs, hex.pm, repo) |
 | `Enter` | Open selected link in system browser |
-| `r` | Force-refresh GitHub stats and version history for current package |
+| `s` | Search HexDocs for this package |
+| `r` | Force-refresh GitHub stats and version history |
+
+### HexDocs search view
+
+| Key | Action |
+| --- | --- |
+| `Esc` / `q` | Back to previous view |
+| `↑↓` `j k` | Navigate results |
+| `Enter` | Open result in system browser |
 
 ## GitHub stats
 
@@ -150,12 +160,23 @@ hexplorer --output json --lang elixir | jq '.[].name'
 hexplorer --output detail lustre
 ```
 
+## HexDocs search
+
+Press `D` from the list view (or `s` from the detail view) to search the documentation of the selected package directly inside the TUI. hexplorer fetches the package's ExDoc search index and filters results locally — no browser required until you open one.
+
+Results show the item type (`value`, `module`, `page`, `type`, `callback`), title, parent module, a doc snippet, and the target URL. Press `Enter` to open the exact page in your system browser.
+
+The search index is cached to disk (default 24h TTL). Configure the TTL via `?` → settings → `docs cache`.
+
 ## Cache & snapshots
 
 All data lives under `~/.cache/hexplorer/`:
 
 ```
 ~/.cache/hexplorer/
+├── docs/                ExDoc search indexes per package (24h TTL, configurable)
+│   ├── gleam_stdlib.json
+│   └── ...
 ├── favorites.json       Starred package names
 ├── gh_stats.json        GitHub stats (6h TTL, pruned at 42h)
 ├── meta.json            Config + digest timestamps
@@ -165,6 +186,7 @@ All data lives under `~/.cache/hexplorer/`:
 ```
 
 Default retention: **12 weeks**. Configure with `hexplorer storage config keep_weeks=N`.
+Docs cache TTL: configurable via `?` → settings → `docs cache` (presets: off, 1h, 6h, 12h, 24h, 48h, 1 week).
 
 ## License
 
