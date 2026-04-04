@@ -45,6 +45,7 @@ pub fn render(f: &mut Frame, app: &App) {
         View::List => draw_list_view(f, app, content),
         View::Detail => draw_detail_view(f, app, content),
         View::Settings => draw_settings_view(f, app, content),
+        View::DocsSearch => draw_docs_search_view(f, app, content),
     }
     draw_footer(f, app, footer);
 }
@@ -802,6 +803,27 @@ fn draw_settings_view(f: &mut Frame, app: &App, area: Rect) {
         Span::styled("  enter to toggle", Style::new().fg(p.dim).italic()),
     ]));
 
+    // docs_cache_ttl row
+    let is_dct = rows[cursor] == SettingRow::DocsCacheTtl;
+    let (pre, col) = if is_dct {
+        ("▶  ", ac)
+    } else {
+        ("   ", p.white)
+    };
+    let ttl_val = match app.settings_config.docs_cache_ttl_hours {
+        0 => "off".to_string(),
+        1 => "1h".to_string(),
+        h if h < 24 => format!("{h}h"),
+        168 => "1 week".to_string(),
+        h => format!("{}h", h),
+    };
+    lines.push(Line::from(vec![
+        Span::styled(pre, Style::new().fg(ac).bold()),
+        Span::styled("docs cache  ", Style::new().fg(p.dim)),
+        Span::styled(ttl_val, Style::new().fg(col).bold()),
+        Span::styled("  ← →", Style::new().fg(p.dim).italic()),
+    ]));
+
     // gh cache row
     let is_gc = rows[cursor] == SettingRow::ClearGhCache;
     let (pre, col) = if is_gc {
@@ -834,11 +856,144 @@ fn mask_token_ui(t: &str) -> String {
     }
 }
 
+// ── Docs search view ─────────────────────────────────────────────────────────
+
+fn draw_docs_search_view(f: &mut Frame, app: &App, area: Rect) {
+    let p = pal(app);
+    let accent = accent(app);
+
+    let pkg = &app.docs_search_pkg;
+    let block = Block::bordered()
+        .border_type(BorderType::Rounded)
+        .border_style(Style::new().fg(accent))
+        .title(Span::styled(
+            format!(" hexdocs: {pkg} "),
+            Style::new().fg(accent).bold(),
+        ))
+        .title_bottom(Span::styled(" esc / q → back ", Style::new().fg(p.dim)));
+
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    if app.docs_search_loading {
+        f.render_widget(
+            Paragraph::new("\n  ⟳  searching hexdocs…").style(Style::new().fg(p.dim).italic()),
+            inner,
+        );
+        return;
+    }
+
+    if app.docs_search_results.is_empty() {
+        f.render_widget(
+            Paragraph::new("\n  no results").style(Style::new().fg(p.dim)),
+            inner,
+        );
+        return;
+    }
+
+    // Split: list on top, doc snippet at bottom for selected item.
+    let [list_area, snippet_area] =
+        Layout::vertical([Constraint::Fill(1), Constraint::Length(4)]).areas(inner);
+
+    // ── Results list ─────────────────────────────────────────────────────────
+    let items: Vec<ListItem> = app
+        .docs_search_results
+        .iter()
+        .map(|item| {
+            let badge_color = match item.item_type.as_str() {
+                "module" => p.dim,
+                "page" => p.white,
+                "callback" | "type" => p.yellow,
+                _ => accent, // "value" and anything else
+            };
+            let badge = format!("[{:<8}]", item.item_type);
+            let spans = vec![
+                Span::styled(badge, Style::new().fg(badge_color)),
+                Span::styled(" ", Style::new()),
+                Span::styled(item.title.clone(), Style::new().fg(p.white).bold()),
+                Span::styled("  ", Style::new()),
+                Span::styled(item.parent_title.clone(), Style::new().fg(p.dim)),
+            ];
+            ListItem::new(Line::from(spans))
+        })
+        .collect();
+
+    let mut list_state = ratatui::widgets::ListState::default();
+    list_state.select(Some(app.docs_search_cursor));
+
+    let list = List::new(items)
+        .highlight_symbol("▶ ")
+        .highlight_style(Style::new().bg(p.bg_sel).fg(accent).bold());
+
+    f.render_stateful_widget(list, list_area, &mut list_state);
+
+    // ── Doc snippet for selected item ─────────────────────────────────────────
+    if let Some(item) = app.docs_search_results.get(app.docs_search_cursor) {
+        let w = snippet_area.width as usize;
+        let snippet: String = item
+            .doc_text
+            .lines()
+            .flat_map(|l| l.split_whitespace())
+            .fold(String::new(), |mut acc, word| {
+                if acc.is_empty() {
+                    acc.push_str(word);
+                } else if acc.len() + word.len() + 1 < w.saturating_sub(4) {
+                    acc.push(' ');
+                    acc.push_str(word);
+                }
+                acc
+            });
+        let url = format!("https://hexdocs.pm/{pkg}/{}", item.ref_url);
+        let lines = vec![
+            Line::from(Span::styled(
+                "─".repeat(snippet_area.width as usize),
+                Style::new().fg(p.dim),
+            )),
+            Line::from(Span::styled(
+                format!(
+                    "  {}",
+                    if snippet.is_empty() {
+                        "—".to_string()
+                    } else {
+                        snippet
+                    }
+                ),
+                Style::new().fg(p.dim),
+            )),
+            Line::from(Span::styled(
+                format!("  {url}"),
+                Style::new().fg(accent).underlined(),
+            )),
+        ];
+        f.render_widget(Paragraph::new(lines), snippet_area);
+    }
+}
+
 // ── Footer ────────────────────────────────────────────────────────────────────
 
 fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
     let p = pal(app);
     let accent = accent(app);
+
+    // Docs search modal overrides the footer while active.
+    if app.docs_search_mode {
+        let pkg_name = app.selected().map(|pkg| pkg.name.as_str()).unwrap_or("?");
+        let spans = vec![
+            Span::styled(" Search ", Style::new().fg(p.dim)),
+            Span::styled(pkg_name, Style::new().fg(accent).bold()),
+            Span::styled(" docs: ", Style::new().fg(p.dim)),
+            Span::styled(
+                format!("{}_", app.docs_search_input),
+                Style::new().fg(p.yellow).bold(),
+            ),
+            Span::styled("  ↵ open · esc cancel", Style::new().fg(p.dim).italic()),
+        ];
+        f.render_widget(
+            Paragraph::new(Line::from(spans)).style(Style::new().bg(p.bg_bar)),
+            area,
+        );
+        return;
+    }
 
     let spans: Vec<Span> = match app.view {
         View::List => {
@@ -865,6 +1020,8 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
                 spans.push(Span::styled("f", Style::new().fg(p.yellow).bold()));
                 spans.push(Span::styled(" favorites  ", Style::new().fg(p.dim)));
             }
+            spans.push(Span::styled("D", Style::new().fg(p.green).bold()));
+            spans.push(Span::styled(" docs search  ", Style::new().fg(p.dim)));
             spans.push(Span::styled("r", Style::new().fg(accent).bold()));
             spans.push(Span::styled(" refresh  ", Style::new().fg(p.dim)));
             spans.push(Span::styled("?", Style::new().fg(accent).bold()));
@@ -884,8 +1041,18 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
             Span::styled(" link  ", Style::new().fg(p.dim)),
             Span::styled("enter", Style::new().fg(accent).bold()),
             Span::styled(" open  ", Style::new().fg(p.dim)),
+            Span::styled("s", Style::new().fg(p.green).bold()),
+            Span::styled(" docs search  ", Style::new().fg(p.dim)),
             Span::styled("r", Style::new().fg(p.green).bold()),
             Span::styled(" refresh pkg", Style::new().fg(p.dim)),
+        ],
+        View::DocsSearch => vec![
+            Span::styled(" esc / q", Style::new().fg(accent).bold()),
+            Span::styled(" back  ", Style::new().fg(p.dim)),
+            Span::styled("↑↓ j k", Style::new().fg(accent).bold()),
+            Span::styled(" navigate  ", Style::new().fg(p.dim)),
+            Span::styled("enter", Style::new().fg(accent).bold()),
+            Span::styled(" open in browser", Style::new().fg(p.dim)),
         ],
         View::Settings => vec![
             Span::styled(" esc / q", Style::new().fg(SETTINGS_ACCENT).bold()),

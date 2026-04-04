@@ -10,7 +10,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::api::GithubStats;
+use crate::api::{GithubStats, SearchItem};
 
 // ── TTL ───────────────────────────────────────────────────────────────────────
 
@@ -111,4 +111,65 @@ pub fn insert(map: &mut CacheMap, repo_url: String, stats: &GithubStats) {
     map.insert(repo_url, CachedEntry::from(stats));
     map.retain(|_, e| unix_now().saturating_sub(e.cached_at) < PRUNE_SECS);
     save(map);
+}
+
+// ── Docs search cache ─────────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize, Deserialize)]
+struct DocsCacheEntry {
+    items: Vec<SearchItem>,
+    cached_at: u64,
+}
+
+fn docs_cache_path(package: &str) -> Option<PathBuf> {
+    dirs::cache_dir().map(|d| {
+        d.join("hexplorer")
+            .join("docs")
+            .join(format!("{package}.json"))
+    })
+}
+
+/// Return cached docs items for `package` if they exist and are within `ttl_hours`.
+/// Returns `None` when ttl_hours == 0 (cache disabled) or entry is stale/missing.
+pub fn get_docs(package: &str, ttl_hours: u32) -> Option<Vec<SearchItem>> {
+    if ttl_hours == 0 {
+        return None;
+    }
+    let path = docs_cache_path(package)?;
+    let bytes = fs::read(&path).ok()?;
+    let entry: DocsCacheEntry = serde_json::from_slice(&bytes).ok()?;
+    let ttl_secs = ttl_hours as u64 * 3600;
+    if unix_now().saturating_sub(entry.cached_at) < ttl_secs {
+        Some(entry.items)
+    } else {
+        None
+    }
+}
+
+/// Write docs items for `package` to disk. No-op when ttl_hours == 0.
+pub fn insert_docs(package: &str, items: &[SearchItem], ttl_hours: u32) {
+    if ttl_hours == 0 {
+        return;
+    }
+    let Some(path) = docs_cache_path(package) else {
+        return;
+    };
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let entry = DocsCacheEntry {
+        items: items.to_vec(),
+        cached_at: unix_now(),
+    };
+    if let Ok(json) = serde_json::to_vec_pretty(&entry) {
+        let _ = fs::write(&path, json);
+    }
+}
+
+/// Remove all cached docs files.
+pub fn clear_docs() {
+    let Some(dir) = dirs::cache_dir().map(|d| d.join("hexplorer").join("docs")) else {
+        return;
+    };
+    let _ = fs::remove_dir_all(dir);
 }

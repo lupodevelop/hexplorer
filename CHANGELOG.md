@@ -3,6 +3,20 @@
 All notable changes to hexplorer are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.4] — 2026-04-04
+
+### Added
+
+- **HexDocs in-TUI search** — press `D` from the list view or `s` from the detail view to open a search modal. After typing a term and pressing `Enter`, hexplorer fetches the package's ExDoc search index (`search_data.json` / `search-data.json`) and shows filtered results in a dedicated `DocsSearch` view with type badges, doc snippets, and the target URL. `Enter` on a result opens the exact page in the system browser; `Esc`/`q` returns to the previous view.
+- **Docs search cache** — the ExDoc search index is cached to `~/.cache/hexplorer/docs/{package}.json`. Default TTL is 24 hours. Configurable via `?` → settings → `docs cache` with `←`/`→` (presets: off · 1h · 6h · 12h · 24h · 48h · 1 week). "Clear cache" in settings now also wipes the docs cache.
+- **Session cache for package listings** — navigation between pages, sort changes, and language switches no longer trigger redundant HTTP requests within the same session. The cache is keyed on `(query, sort, language, page)` and cleared on manual refresh (`r`).
+- **Package version history in detail view** — opening a package detail now fetches the full release list from `GET /api/packages/{name}` in the background. Up to 10 most-recent versions are shown in a new `versions` section; the list updates live when the fetch completes.
+- **`(cached)` indicator in header** — when a listing is served from the session cache, the package count badge shows `(cached)`.
+
+### Changed
+
+- Detail view `r` key now force-refreshes both GitHub stats and version history for the current package.
+
 ## [0.1.3] — 2026-04-03
 
 ### Added
@@ -10,10 +24,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `?` settings screen now includes a `default_language` row and `color_scheme` row with `←`/`→` to cycle values.
 - `Ctrl+W` / `Ctrl+Backspace` now delete the previous word in search mode and in the GitHub token input field.
 - Detail view: `Tab` / `Shift+Tab` cycle a cursor through the available links (docs, hex.pm, repo). `Enter` opens the selected link in the system browser.
-- Detail view: `r` force-refreshes GitHub stats and version history for the currently selected package only (evicts its entry from both the GH stats cache and the in-memory listing cache).
 - Settings screen: new `link_style` row (under Appearance) cycles between `Cursor ▶` (vim-like marker) and `Block ■` (solid accent-color background on the selected link row). Setting persists to `meta.json`.
-- Header now shows a colored cache-status badge: `● live` (green) after a fresh network fetch, `◎ cached` (yellow) when results are served from the in-memory session cache, and `⟳ fetching…` (dim) while a request is in flight.
-- In-memory session cache (`pkg_cache`) stores listing results keyed by `(query, sort, language, page)` — repeated navigation to the same view is instant and avoids redundant HTTP requests.
 
 ### Changed
 - `hexplorer` now loads `default_language` from `~/.cache/hexplorer/meta.json` when `--lang` is not explicitly passed.

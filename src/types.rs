@@ -212,6 +212,7 @@ pub enum View {
     List,
     Detail,
     Settings,
+    DocsSearch,
 }
 
 // ── SettingRow ────────────────────────────────────────────────────────────────
@@ -225,6 +226,7 @@ pub enum SettingRow {
     DefaultLanguage,
     KeepWeeks,
     Compress,
+    DocsCacheTtl,
     ClearGhCache,
 }
 
@@ -237,6 +239,7 @@ impl SettingRow {
             Self::DefaultLanguage,
             Self::KeepWeeks,
             Self::Compress,
+            Self::DocsCacheTtl,
             Self::ClearGhCache,
         ]
     }

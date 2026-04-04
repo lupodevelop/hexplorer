@@ -71,6 +71,52 @@ pub struct Package {
     pub versions: Vec<String>,
 }
 
+// ── HexDocs search types ──────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SearchItem {
+    /// "value", "module", "page", "callback", "type"
+    pub item_type: String,
+    pub title: String,
+    pub parent_title: String,
+    /// Plain text doc snippet (HTML stripped).
+    pub doc_text: String,
+    /// Relative URL within the package docs, e.g. "gleeunit.html#main".
+    pub ref_url: String,
+}
+
+#[derive(Deserialize)]
+struct RawSearchItem {
+    #[serde(rename = "type")]
+    item_type: String,
+    title: String,
+    #[serde(rename = "parentTitle")]
+    parent_title: String,
+    doc: String,
+    #[serde(rename = "ref")]
+    ref_url: String,
+}
+
+#[derive(Deserialize)]
+struct SearchData {
+    items: Vec<RawSearchItem>,
+}
+
+/// Strip HTML tags via a simple char-scan — no regex dependency needed.
+fn strip_html(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut in_tag = false;
+    for c in s.chars() {
+        match c {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            _ if !in_tag => out.push(c),
+            _ => {}
+        }
+    }
+    out
+}
+
 // ── GitHub types ──────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone)]
@@ -423,4 +469,39 @@ pub async fn fetch_github_stats(repo_url: &str, token: Option<&str>) -> Result<G
         forks: gh.forks_count,
         issues: gh.open_issues_count,
     }))
+}
+
+/// Fetch the ExDoc search index for a HexDocs package.
+/// Returns a flat list of searchable items (functions, types, modules, pages).
+///
+/// ExDoc has produced two filename variants across versions:
+/// - `search_data.json`  (underscore — older ExDoc)
+/// - `search-data.json`  (hyphen — newer ExDoc ≥ 1.14)
+///   We try the underscore variant first, then fall back to hyphen.
+pub async fn fetch_docs_search_data(package: &str) -> Result<Vec<SearchItem>> {
+    let c = client()?;
+    let url_underscore = format!("https://hexdocs.pm/{package}/search_data.json");
+    let url_hyphen = format!("https://hexdocs.pm/{package}/search-data.json");
+
+    let resp = {
+        let r = c.get(&url_underscore).send().await?;
+        if r.status().is_success() {
+            r
+        } else {
+            c.get(&url_hyphen).send().await?.error_for_status()?
+        }
+    };
+
+    let data: SearchData = resp.json().await?;
+    Ok(data
+        .items
+        .into_iter()
+        .map(|r| SearchItem {
+            item_type: r.item_type,
+            title: r.title,
+            parent_title: r.parent_title,
+            doc_text: strip_html(&r.doc),
+            ref_url: r.ref_url,
+        })
+        .collect())
 }
