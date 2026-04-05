@@ -883,6 +883,16 @@ fn draw_docs_search_view(f: &mut Frame, app: &App, area: Rect) {
         return;
     }
 
+    if let Some(err) = &app.docs_search_error {
+        f.render_widget(
+            Paragraph::new(format!("\n  ✗  {err}"))
+                .style(Style::new().fg(Color::Red))
+                .wrap(Wrap { trim: true }),
+            inner,
+        );
+        return;
+    }
+
     if app.docs_search_results.is_empty() {
         f.render_widget(
             Paragraph::new("\n  no results").style(Style::new().fg(p.dim)),

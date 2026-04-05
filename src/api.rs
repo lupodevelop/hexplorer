@@ -2,7 +2,7 @@
 
 use anyhow::{Context, Result};
 use log::{debug, error, info};
-use reqwest::Client;
+use reqwest::{Client, Url};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -91,8 +91,9 @@ struct RawSearchItem {
     #[serde(rename = "type")]
     item_type: String,
     title: String,
-    #[serde(rename = "parentTitle")]
+    #[serde(rename = "parentTitle", default)]
     parent_title: String,
+    #[serde(default)]
     doc: String,
     #[serde(rename = "ref")]
     ref_url: String,
@@ -555,41 +556,90 @@ pub async fn fetch_docs_search_data(package: &str) -> Result<Vec<SearchItem>> {
     let url_hyphen = format!("https://hexdocs.pm/{package}/search-data.json");
     info!("[docs] fetch_docs_search_data package={package} underscore={url_underscore} hyphen={url_hyphen}");
 
-    let resp = {
-        let r = c.get(&url_underscore).send().await?;
-        if r.status().is_success() {
-            debug!("[docs] docs search fetched underscore url={}", r.url());
-            r
+    let mut resp = c.get(&url_underscore).send().await?;
+    if resp.status().is_success() {
+        debug!("[docs] docs search fetched underscore url={}", resp.url());
+    } else {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        error!(
+            "[docs] docs search underscore failed: {} {}",
+            status, url_underscore
+        );
+        error!(
+            "[docs] docs search underscore body: {}",
+            body.lines().take(8).collect::<Vec<_>>().join("\n")
+        );
+
+        resp = c.get(&url_hyphen).send().await?;
+        let url2 = resp.url().clone();
+        if resp.status().is_success() {
+            debug!("[docs] docs search fetched hyphen url={}", url2);
         } else {
-            let status = r.status();
-            let body = r.text().await.unwrap_or_default();
+            let status2 = resp.status();
+            let body2 = resp.text().await.unwrap_or_default();
+            error!("[docs] docs search hyphen failed: {} {}", status2, url2);
             error!(
-                "[docs] docs search underscore failed: {} {}",
-                status, url_underscore
-            );
-            error!(
-                "[docs] docs search underscore body: {}",
-                body.lines().take(8).collect::<Vec<_>>().join("\n")
+                "[docs] docs search hyphen body: {}",
+                body2.lines().take(8).collect::<Vec<_>>().join("\n")
             );
 
-            let r2 = c.get(&url_hyphen).send().await?;
-            let url2 = r2.url().clone();
-            if !r2.status().is_success() {
-                let status2 = r2.status();
-                let body2 = r2.text().await.unwrap_or_default();
-                error!("[docs] docs search hyphen failed: {} {}", status2, url2);
-                error!(
-                    "[docs] docs search hyphen body: {}",
-                    body2.lines().take(8).collect::<Vec<_>>().join("\n")
-                );
+            let search_html_url = format!("https://hexdocs.pm/{package}/search.html");
+            let page_resp = c.get(&search_html_url).send().await;
+            let fallback_resp = if let Ok(page_resp) = page_resp {
+                if page_resp.status().is_success() {
+                    let page_body = page_resp.text().await.unwrap_or_default();
+                    if let Some(search_url) = find_search_index_url(&search_html_url, &page_body) {
+                        let fallback_resp = c.get(&search_url).send().await?;
+                        let fallback_url = fallback_resp.url().clone();
+                        if fallback_resp.status().is_success() {
+                            debug!("[docs] docs search fetched fallback url={}", fallback_url);
+                            Some(fallback_resp)
+                        } else {
+                            let status3 = fallback_resp.status();
+                            let body3 = fallback_resp.text().await.unwrap_or_default();
+                            error!(
+                                "[docs] docs search fallback failed: {} {}",
+                                status3, fallback_url
+                            );
+                            error!(
+                                "[docs] docs search fallback body: {}",
+                                body3.lines().take(8).collect::<Vec<_>>().join("\n")
+                            );
+                            None
+                        }
+                    } else if page_body.contains("searchData") {
+                        let data: SearchData = parse_search_data(&page_body)?;
+                        return Ok(data
+                            .items
+                            .into_iter()
+                            .map(|r| SearchItem {
+                                item_type: r.item_type,
+                                title: r.title,
+                                parent_title: r.parent_title,
+                                doc_text: strip_html(&r.doc),
+                                ref_url: r.ref_url,
+                            })
+                            .collect());
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            if let Some(fallback_resp) = fallback_resp {
+                resp = fallback_resp;
+            } else {
                 return Err(anyhow::anyhow!(
-                    "docs search failed for both underscore and hyphen variants"
+                    "docs search failed for underscore, hyphen, and HTML fallback variants"
                 ));
             }
-            debug!("[docs] docs search fetched hyphen url={}", url2);
-            r2
         }
-    };
+    }
 
     let url = resp.url().clone();
     let status = resp.status();
@@ -600,7 +650,7 @@ pub async fn fetch_docs_search_data(package: &str) -> Result<Vec<SearchItem>> {
         url,
         body.len()
     );
-    let data: SearchData = serde_json::from_str(&body).context("parsing docs search response")?;
+    let data: SearchData = parse_search_data(&body)?;
     Ok(data
         .items
         .into_iter()
@@ -612,4 +662,119 @@ pub async fn fetch_docs_search_data(package: &str) -> Result<Vec<SearchItem>> {
             ref_url: r.ref_url,
         })
         .collect())
+}
+
+fn parse_search_data(body: &str) -> Result<SearchData> {
+    let body = body.trim();
+    let start = body.find("searchData").unwrap_or_default();
+
+    let tail = if start > 0 {
+        &body[start + "searchData".len()..]
+    } else {
+        body
+    };
+    let tail = tail.trim_start();
+    let json_start = if let Some(eq_pos) = tail.find('=') {
+        tail[eq_pos + 1..].trim_start()
+    } else {
+        tail
+    };
+
+    let json_text = if json_start.starts_with('{') {
+        extract_json_object(json_start)
+    } else {
+        json_start.trim_end_matches(';').trim()
+    };
+
+    serde_json::from_str(json_text).context("parsing docs search response")
+}
+
+fn extract_json_object(s: &str) -> &str {
+    let mut depth = 0;
+    let mut in_string = false;
+    let mut escape = false;
+    for (idx, c) in s.char_indices() {
+        if in_string {
+            if escape {
+                escape = false;
+            } else if c == '\\' {
+                escape = true;
+            } else if c == '"' {
+                in_string = false;
+            }
+        } else {
+            match c {
+                '{' => depth += 1,
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return &s[..=idx];
+                    }
+                }
+                '"' => in_string = true,
+                _ => {}
+            }
+        }
+    }
+    s.trim_end_matches(';').trim()
+}
+
+fn find_search_index_url(base_url: &str, html: &str) -> Option<String> {
+    let base = Url::parse(base_url).ok()?;
+    let candidates = [
+        "dist/search_data-",
+        "dist/search-data-",
+        "search_data.json",
+        "search-data.json",
+        "search.json",
+        "search-index.json",
+    ];
+
+    let mut start = 0;
+    while let Some(src_pos) = html[start..].find("src=") {
+        let src_pos = start + src_pos + "src=".len();
+        let trimmed = html[src_pos..].trim_start();
+        let quote = match trimmed.chars().next() {
+            Some(q) if q == '"' || q == '\'' => q,
+            _ => {
+                start = src_pos;
+                continue;
+            }
+        };
+        let trimmed = &trimmed[1..];
+        if let Some(end_quote) = trimmed.find(quote) {
+            let path = &trimmed[..end_quote];
+            if candidates.iter().any(|candidate| path.contains(candidate)) {
+                if let Ok(url) = base.join(path) {
+                    return Some(url.into());
+                }
+            }
+            start = src_pos + 1 + end_quote;
+            continue;
+        }
+        break;
+    }
+
+    for candidate in candidates {
+        let mut start = 0;
+        while let Some(pos) = html[start..].find(candidate) {
+            let pos = start + pos;
+            if let Some(path) = extract_quoted_path(html, pos) {
+                if let Ok(url) = base.join(&path) {
+                    return Some(url.into());
+                }
+            }
+            start = pos + candidate.len();
+        }
+    }
+    None
+}
+
+fn extract_quoted_path(html: &str, pos: usize) -> Option<String> {
+    let before = &html[..pos];
+    let quote_pos = before.rfind(['"', '\''])?;
+    let quote = html.chars().nth(quote_pos)?;
+    let suffix = &html[pos..];
+    let end = suffix.find(quote)?;
+    Some(html[quote_pos + 1..pos + end].to_string())
 }
