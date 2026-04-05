@@ -57,6 +57,8 @@ pub enum Msg {
     DetailLoaded(String, Vec<String>),
     /// HexDocs search index fetch result: (query_term, filtered_results).
     DocsSearchLoaded(String, Vec<SearchItem>),
+    /// HexDocs search error: (query_term, error_message).
+    DocsSearchError(String, String),
     Err(String),
 }
 
@@ -124,6 +126,8 @@ pub struct App {
     pub docs_search_cursor: usize,
     /// Package name whose docs are being searched (for building open URLs).
     pub docs_search_pkg: String,
+    /// Error message to show when a docs search fetch failed.
+    pub docs_search_error: Option<String>,
     /// View to return to when closing DocsSearch (List or Detail).
     prev_view: View,
     /// Active docs cache TTL in hours — mirrors settings_config, loaded at startup.
@@ -177,6 +181,7 @@ impl App {
             docs_search_results: vec![],
             docs_search_cursor: 0,
             docs_search_pkg: String::new(),
+            docs_search_error: None,
             prev_view: View::List,
             docs_cache_ttl_hours: storage::load_meta()
                 .map(|m| m.config.docs_cache_ttl_hours)
@@ -337,8 +342,15 @@ impl App {
                     results.len()
                 );
                 self.docs_search_loading = false;
+                self.docs_search_error = None;
                 self.docs_search_results = results;
                 self.docs_search_cursor = 0;
+            }
+            Msg::DocsSearchError(_term, error) => {
+                error!("[msg] DocsSearchError: {error}");
+                self.docs_search_loading = false;
+                self.docs_search_results.clear();
+                self.docs_search_error = Some(error);
             }
             Msg::GhFetched(repo_url, result) => {
                 let result_label = match &result {
@@ -703,6 +715,7 @@ impl App {
         self.view = View::DocsSearch;
         self.docs_search_results.clear();
         self.docs_search_cursor = 0;
+        self.docs_search_error = None;
 
         // Serve from disk cache if available and TTL not expired.
         let ttl = self.docs_cache_ttl_hours;
@@ -737,8 +750,10 @@ impl App {
                         .collect();
                     let _ = tx.send(Msg::DocsSearchLoaded(term, results)).await;
                 }
-                Err(_) => {
-                    let _ = tx.send(Msg::DocsSearchLoaded(term, vec![])).await;
+                Err(e) => {
+                    let _ = tx
+                        .send(Msg::DocsSearchError(term, e.to_string()))
+                        .await;
                 }
             }
         });
