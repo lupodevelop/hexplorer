@@ -8,7 +8,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - **HexDocs search broken for Elixir/Erlang packages** — modern ExDoc (≥ v0.34) no longer generates `search_data.json` or `search-data.json`. Instead it generates `dist/search_data-{DIGEST}.js` containing a JS variable assignment (`searchData={...}`). hexplorer now falls back to fetching `search.html`, scraping the `<script src="dist/search_data-*.js">` tag, fetching the JS file, and parsing its `searchData=` payload. Packages built with older ExDoc (flat JSON) continue to work as before.
-
+- **Cross-language package leaking into filtered views** — when searching by a specific language (e.g. Gleam) and the full-text search returned no results, the exact-name fallback lookup would accept packages with unknown build tools (`Language::All`) and re-label them as the selected language. For example, `credo` (Elixir) appeared as a Gleam package. The fallback now only includes packages whose `build_tools` positively confirm the selected language; packages from a different ecosystem are silently skipped and the search returns empty.
 - **Docs search error surfaced in UI** — when all fetch strategies fail, a red error message is shown in the docs-search view instead of silently displaying an empty list.
 
 ## [0.1.4] — 2026-04-04

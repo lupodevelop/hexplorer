@@ -402,13 +402,20 @@ pub async fn fetch_packages(
 
         // Fallback: if even the 500-package search returns nothing, try an exact name lookup.
         // Handles packages outside the top-500 (e.g. very new or niche packages).
+        // NOTE: only include the package if we can positively confirm it belongs to the
+        // selected language. Packages with unknown build_tools (Language::All) are excluded
+        // to avoid showing e.g. Elixir packages labelled as Gleam.
         if packages.is_empty() {
             info!("[fetch] search fallback: no results from full-text search, trying exact package lookup for {q}");
-            if let Ok(mut pkg) = fetch_package(q).await {
-                if pkg.language == language || pkg.language == Language::All {
+            if let Ok(pkg) = fetch_package(q).await {
+                if pkg.language == language {
                     info!("[fetch] fallback exact package found: {q} lang={language}");
-                    pkg.language = language;
                     packages.push(pkg);
+                } else {
+                    info!(
+                        "[fetch] fallback exact package {q} has language={}, expected {language} — skipping",
+                        pkg.language
+                    );
                 }
             }
         }
