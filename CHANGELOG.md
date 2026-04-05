@@ -3,6 +3,14 @@
 All notable changes to hexplorer are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.5] — 2026-04-05
+
+### Fixed
+
+- **HexDocs search broken for Elixir/Erlang packages** — modern ExDoc (≥ v0.34) no longer generates `search_data.json` or `search-data.json`. Instead it generates `dist/search_data-{DIGEST}.js` containing a JS variable assignment (`searchData={...}`). hexplorer now falls back to fetching `search.html`, scraping the `<script src="dist/search_data-*.js">` tag, fetching the JS file, and parsing its `searchData=` payload. Packages built with older ExDoc (flat JSON) continue to work as before.
+
+- **Docs search error surfaced in UI** — when all fetch strategies fail, a red error message is shown in the docs-search view instead of silently displaying an empty list.
+
 ## [0.1.4] — 2026-04-04
 
 ### Added
