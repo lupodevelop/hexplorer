@@ -598,7 +598,10 @@ pub async fn fetch_docs_search_data(package: &str) -> Result<Vec<SearchItem>> {
                         } else {
                             let status3 = fallback_resp.status();
                             let body3 = fallback_resp.text().await.unwrap_or_default();
-                            error!("[docs] docs search fallback failed: {} {}", status3, fallback_url);
+                            error!(
+                                "[docs] docs search fallback failed: {} {}",
+                                status3, fallback_url
+                            );
                             error!(
                                 "[docs] docs search fallback body: {}",
                                 body3.lines().take(8).collect::<Vec<_>>().join("\n")
@@ -663,11 +666,7 @@ pub async fn fetch_docs_search_data(package: &str) -> Result<Vec<SearchItem>> {
 
 fn parse_search_data(body: &str) -> Result<SearchData> {
     let body = body.trim();
-    let start = if let Some(pos) = body.find("searchData") {
-        pos
-    } else {
-        0
-    };
+    let start = body.find("searchData").unwrap_or_default();
 
     let tail = if start > 0 {
         &body[start + "searchData".len()..]
@@ -722,7 +721,14 @@ fn extract_json_object(s: &str) -> &str {
 
 fn find_search_index_url(base_url: &str, html: &str) -> Option<String> {
     let base = Url::parse(base_url).ok()?;
-    let candidates = ["dist/search_data-", "dist/search-data-", "search_data.json", "search-data.json", "search.json", "search-index.json"];
+    let candidates = [
+        "dist/search_data-",
+        "dist/search-data-",
+        "search_data.json",
+        "search-data.json",
+        "search.json",
+        "search-index.json",
+    ];
 
     let mut start = 0;
     while let Some(src_pos) = html[start..].find("src=") {
@@ -730,7 +736,10 @@ fn find_search_index_url(base_url: &str, html: &str) -> Option<String> {
         let trimmed = html[src_pos..].trim_start();
         let quote = match trimmed.chars().next() {
             Some(q) if q == '"' || q == '\'' => q,
-            _ => { start = src_pos; continue; }
+            _ => {
+                start = src_pos;
+                continue;
+            }
         };
         let trimmed = &trimmed[1..];
         if let Some(end_quote) = trimmed.find(quote) {
@@ -763,7 +772,7 @@ fn find_search_index_url(base_url: &str, html: &str) -> Option<String> {
 
 fn extract_quoted_path(html: &str, pos: usize) -> Option<String> {
     let before = &html[..pos];
-    let quote_pos = before.rfind(|c| c == '"' || c == '\'')?;
+    let quote_pos = before.rfind(['"', '\''])?;
     let quote = html.chars().nth(quote_pos)?;
     let suffix = &html[pos..];
     let end = suffix.find(quote)?;

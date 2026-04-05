@@ -885,7 +885,9 @@ fn draw_docs_search_view(f: &mut Frame, app: &App, area: Rect) {
 
     if let Some(err) = &app.docs_search_error {
         f.render_widget(
-            Paragraph::new(format!("\n  ✗  {err}")).style(Style::new().fg(Color::Red)).wrap(Wrap { trim: true }),
+            Paragraph::new(format!("\n  ✗  {err}"))
+                .style(Style::new().fg(Color::Red))
+                .wrap(Wrap { trim: true }),
             inner,
         );
         return;

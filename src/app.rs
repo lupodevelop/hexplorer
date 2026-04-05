@@ -751,9 +751,7 @@ impl App {
                     let _ = tx.send(Msg::DocsSearchLoaded(term, results)).await;
                 }
                 Err(e) => {
-                    let _ = tx
-                        .send(Msg::DocsSearchError(term, e.to_string()))
-                        .await;
+                    let _ = tx.send(Msg::DocsSearchError(term, e.to_string())).await;
                 }
             }
         });
