@@ -95,27 +95,43 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
     draw_tab_bar(f, app, center);
 
     // ── Right: search + sort ──────────────────────────────────────────────────
-    let (search_txt, search_sty) = if app.input_mode {
+    let (search_txt, search_sty, search_border) = if app.view == View::DocsSearch {
+        if app.input.is_empty() {
+            (
+                "  type to filter results…".to_string(),
+                Style::new().fg(p.dim).italic(),
+                Style::new().fg(accent),
+            )
+        } else {
+            (
+                format!("  /{}_", app.input),
+                Style::new().fg(p.yellow).bold(),
+                Style::new().fg(p.yellow),
+            )
+        }
+    } else if app.input_mode {
         (
             format!("  /{}_", app.input),
             Style::new().fg(p.yellow).bold(),
+            Style::new().fg(p.yellow),
         )
     } else if app.input.is_empty() {
         (
             "  press / to search…".to_string(),
             Style::new().fg(p.dim).italic(),
+            Style::new().fg(accent),
         )
     } else {
-        (format!("  /{}", app.input), Style::new().fg(p.white))
+        (
+            format!("  /{}", app.input),
+            Style::new().fg(p.white),
+            Style::new().fg(accent),
+        )
     };
 
     let search_block = Block::bordered()
         .border_type(BorderType::Rounded)
-        .border_style(if app.input_mode {
-            Style::new().fg(p.yellow)
-        } else {
-            Style::new().fg(accent)
-        });
+        .border_style(search_border);
 
     let lines = vec![
         Line::from(Span::styled(search_txt, search_sty)),
@@ -1062,7 +1078,9 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
             Span::styled("↑↓ j k", Style::new().fg(accent).bold()),
             Span::styled(" navigate  ", Style::new().fg(p.dim)),
             Span::styled("enter", Style::new().fg(accent).bold()),
-            Span::styled(" open in browser", Style::new().fg(p.dim)),
+            Span::styled(" open  ", Style::new().fg(p.dim)),
+            Span::styled("type", Style::new().fg(p.yellow).bold()),
+            Span::styled(" filter results", Style::new().fg(p.dim)),
         ],
         View::Settings => vec![
             Span::styled(" esc / q", Style::new().fg(SETTINGS_ACCENT).bold()),
