@@ -593,7 +593,10 @@ pub async fn fetch_docs_search_data(package: &str) -> Result<Vec<SearchItem>> {
         let body = resp.text().await.unwrap_or_default();
         match parse_search_data(&body) {
             Ok(data) if !data.items.is_empty() => {
-                info!("[docs] resolved via direct candidate {url} items={}", data.items.len());
+                info!(
+                    "[docs] resolved via direct candidate {url} items={}",
+                    data.items.len()
+                );
                 return Ok(map_search_items(data));
             }
             Ok(_) => debug!("[docs] {url} parsed but empty, continuing"),
@@ -627,7 +630,10 @@ pub async fn fetch_docs_search_data(package: &str) -> Result<Vec<SearchItem>> {
                     let body = r.text().await.unwrap_or_default();
                     match parse_search_data(&body) {
                         Ok(data) if !data.items.is_empty() => {
-                            info!("[docs] resolved via HTML asset {asset_url} items={}", data.items.len());
+                            info!(
+                                "[docs] resolved via HTML asset {asset_url} items={}",
+                                data.items.len()
+                            );
                             return Ok(map_search_items(data));
                         }
                         Ok(_) => debug!("[docs] HTML asset empty"),
@@ -643,7 +649,10 @@ pub async fn fetch_docs_search_data(package: &str) -> Result<Vec<SearchItem>> {
         if page_body.contains("searchData") {
             match parse_search_data(&page_body) {
                 Ok(data) if !data.items.is_empty() => {
-                    info!("[docs] resolved via inline searchData items={}", data.items.len());
+                    info!(
+                        "[docs] resolved via inline searchData items={}",
+                        data.items.len()
+                    );
                     return Ok(map_search_items(data));
                 }
                 Ok(_) => debug!("[docs] inline searchData empty"),
@@ -698,7 +707,9 @@ fn parse_search_data(body: &str) -> Result<SearchData> {
         }
     }
 
-    Err(anyhow::anyhow!("no parseable search data found in response"))
+    Err(anyhow::anyhow!(
+        "no parseable search data found in response"
+    ))
 }
 
 fn extract_json_object(s: &str) -> &str {
@@ -810,7 +821,9 @@ mod tests {
     // ── parse_search_data ─────────────────────────────────────────────────────
 
     fn item(type_: &str, title: &str, ref_: &str) -> String {
-        format!(r#"{{"type":"{type_}","title":"{title}","parentTitle":"","doc":"","ref":"{ref_}"}}"#)
+        format!(
+            r#"{{"type":"{type_}","title":"{title}","parentTitle":"","doc":"","ref":"{ref_}"}}"#
+        )
     }
 
     fn wrap(items: &str) -> String {
@@ -836,7 +849,10 @@ mod tests {
 
     #[test]
     fn parse_js_assignment() {
-        let body = format!(r#"var searchData={};"#, wrap(&item("module", "MyMod", "MyMod.html")));
+        let body = format!(
+            r#"var searchData={};"#,
+            wrap(&item("module", "MyMod", "MyMod.html"))
+        );
         let data = parse_search_data(&body).unwrap();
         assert_eq!(data.items.len(), 1);
         assert_eq!(data.items[0].title, "MyMod");
