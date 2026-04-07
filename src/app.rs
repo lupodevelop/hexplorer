@@ -120,7 +120,10 @@ pub struct App {
     pub docs_search_input: String,
     /// True while the search_data.json fetch is in flight.
     pub docs_search_loading: bool,
-    /// Results from the last HexDocs search, filtered locally.
+    /// Full result set from the last HexDocs fetch (filtered by the initial query term).
+    /// The `input` field is used as a live secondary filter on top of this.
+    docs_search_all_results: Vec<SearchItem>,
+    /// Visible subset of `docs_search_all_results` after applying the `input` filter.
     pub docs_search_results: Vec<SearchItem>,
     /// Cursor index into `docs_search_results`.
     pub docs_search_cursor: usize,
@@ -130,6 +133,8 @@ pub struct App {
     pub docs_search_error: Option<String>,
     /// View to return to when closing DocsSearch (List or Detail).
     prev_view: View,
+    /// `input` value saved when entering DocsSearch — restored on exit.
+    prev_input: String,
     /// Active docs cache TTL in hours — mirrors settings_config, loaded at startup.
     pub docs_cache_ttl_hours: u32,
     tx: Sender<Msg>,
@@ -178,11 +183,13 @@ impl App {
             docs_search_mode: false,
             docs_search_input: String::new(),
             docs_search_loading: false,
+            docs_search_all_results: vec![],
             docs_search_results: vec![],
             docs_search_cursor: 0,
             docs_search_pkg: String::new(),
             docs_search_error: None,
             prev_view: View::List,
+            prev_input: String::new(),
             docs_cache_ttl_hours: storage::load_meta()
                 .map(|m| m.config.docs_cache_ttl_hours)
                 .unwrap_or(24),
@@ -343,8 +350,8 @@ impl App {
                 );
                 self.docs_search_loading = false;
                 self.docs_search_error = None;
-                self.docs_search_results = results;
-                self.docs_search_cursor = 0;
+                self.docs_search_all_results = results;
+                self.apply_docs_filter();
             }
             Msg::DocsSearchError(_term, error) => {
                 error!("[msg] DocsSearchError: {error}");
@@ -712,7 +719,10 @@ impl App {
         };
         self.docs_search_pkg = pkg_name.clone();
         self.prev_view = self.view;
+        self.prev_input = self.input.clone();
+        self.input = String::new();
         self.view = View::DocsSearch;
+        self.docs_search_all_results.clear();
         self.docs_search_results.clear();
         self.docs_search_cursor = 0;
         self.docs_search_error = None;
@@ -721,7 +731,7 @@ impl App {
         let ttl = self.docs_cache_ttl_hours;
         if let Some(cached_items) = cache::get_docs(&pkg_name, ttl) {
             let q = term.to_lowercase();
-            self.docs_search_results = cached_items
+            self.docs_search_all_results = cached_items
                 .into_iter()
                 .filter(|item| {
                     item.title.to_lowercase().contains(&q)
@@ -729,6 +739,7 @@ impl App {
                 })
                 .take(50)
                 .collect();
+            self.docs_search_results = self.docs_search_all_results.clone();
             self.docs_search_loading = false;
             return;
         }
@@ -761,7 +772,9 @@ impl App {
         match key.code {
             KeyCode::Char('q') | KeyCode::Esc => {
                 self.view = self.prev_view;
+                self.docs_search_all_results.clear();
                 self.docs_search_results.clear();
+                self.input = self.prev_input.clone();
             }
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => return true,
             KeyCode::Down | KeyCode::Char('j') => {
@@ -782,9 +795,45 @@ impl App {
                     let _ = open::that(url);
                 }
             }
+            // Live filter: typing narrows the result list.
+            KeyCode::Backspace if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                delete_word_back(&mut self.input);
+                self.apply_docs_filter();
+            }
+            KeyCode::Char('w') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                delete_word_back(&mut self.input);
+                self.apply_docs_filter();
+            }
+            KeyCode::Backspace => {
+                self.input.pop();
+                self.apply_docs_filter();
+            }
+            KeyCode::Char(c) => {
+                self.input.push(c);
+                self.apply_docs_filter();
+            }
             _ => {}
         }
         false
+    }
+
+    /// Re-filter `docs_search_all_results` through the current `input` value
+    /// and update `docs_search_results`. Resets the cursor to 0.
+    fn apply_docs_filter(&mut self) {
+        let q = self.input.trim().to_lowercase();
+        self.docs_search_results = if q.is_empty() {
+            self.docs_search_all_results.clone()
+        } else {
+            self.docs_search_all_results
+                .iter()
+                .filter(|item| {
+                    item.title.to_lowercase().contains(&q)
+                        || item.parent_title.to_lowercase().contains(&q)
+                })
+                .cloned()
+                .collect()
+        };
+        self.docs_search_cursor = 0;
     }
 
     fn key_docs_search(&mut self, key: KeyEvent) -> bool {
