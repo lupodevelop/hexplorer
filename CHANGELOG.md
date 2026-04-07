@@ -5,11 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.1.6] — 2026-04-07
 
+### Added
+
+- **Live filter in HexDocs search view** — after results load, type any characters to narrow the list in real time. The header search bar shows the active filter. `Backspace` / `Ctrl+W` work as usual. Exiting the view (`Esc`/`q`) restores the previous list search keyword.
+
 ### Fixed
 
-- **HexDocs search regression for Gleam packages** — `parse_search_data` searched for `=` in the entire body, finding it inside string values (URLs, Gleam `key=value` patterns) and slicing the JSON at the wrong position. Pure JSON bodies are now parsed directly; `=` is only scanned after the `searchData` keyword for JS assignment format.
-- **Docs search cascade now covers `.js` variants** — direct candidates extended with `search_data.js`, `search-data.js`, `dist/search_data.js`, `dist/search-data.js`; same variants added to HTML asset discovery. Each step continues on empty results instead of returning early.
-- **Unit tests** added for `parse_search_data` and `find_search_index_url` covering the regression case and all format variants.
+- **HexDocs search regression for Gleam packages** — `parse_search_data` used `find('=')` on the entire body, hitting `=` inside string values (URLs, `key=value` patterns) and slicing the JSON incorrectly. Pure JSON is now parsed directly; `=` is only scanned after the `searchData` keyword.
+- **Docs search cascade extended** — direct candidates now include `search_data.js`, `search-data.js`, `dist/search_data.js`, `dist/search-data.js` for packages that serve the index as a JS file. HTML asset discovery updated with the same variants.
 
 ## [0.1.5] — 2026-04-05
 
