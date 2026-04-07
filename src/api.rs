@@ -551,115 +551,124 @@ pub async fn fetch_github_stats(repo_url: &str, token: Option<&str>) -> Result<G
 }
 
 /// Fetch the ExDoc search index for a HexDocs package.
-/// Returns a flat list of searchable items (functions, types, modules, pages).
 ///
-/// ExDoc has produced two filename variants across versions:
-/// - `search_data.json`  (underscore — older ExDoc)
-/// - `search-data.json`  (hyphen — newer ExDoc ≥ 1.14)
-///   We try the underscore variant first, then fall back to hyphen.
+/// Tries candidates in a cascade so both Gleam and Elixir packages are covered:
+///
+/// **Step 1 — direct URL candidates** (tried in order, first non-empty result wins):
+///   `search_data.json` · `search-data.json` · `search_data.js` · `search-data.js`
+///   `dist/search_data.js` · `dist/search-data.js`
+///
+/// **Step 2 — HTML discovery** (if all direct candidates fail):
+///   Fetch `search.html`, scan `<script src="...">` for known asset paths,
+///   fetch the discovered asset, or parse inline `searchData = {...}` from the page.
 pub async fn fetch_docs_search_data(package: &str) -> Result<Vec<SearchItem>> {
     let c = client()?;
-    let url_underscore = format!("https://hexdocs.pm/{package}/search_data.json");
-    let url_hyphen = format!("https://hexdocs.pm/{package}/search-data.json");
-    info!("[docs] fetch_docs_search_data package={package} underscore={url_underscore} hyphen={url_hyphen}");
+    let base = format!("https://hexdocs.pm/{package}/");
+    info!("[docs] fetch_docs_search_data package={package}");
 
-    let mut resp = c.get(&url_underscore).send().await?;
-    if resp.status().is_success() {
-        debug!("[docs] docs search fetched underscore url={}", resp.url());
-    } else {
-        let status = resp.status();
+    // ── Step 1: direct URL candidates ────────────────────────────────────────
+    const DIRECT: &[&str] = &[
+        "search_data.json",
+        "search-data.json",
+        "search_data.js",
+        "search-data.js",
+        "dist/search_data.js",
+        "dist/search-data.js",
+    ];
+
+    for candidate in DIRECT {
+        let url = format!("{base}{candidate}");
+        let resp = match c.get(&url).send().await {
+            Ok(r) => r,
+            Err(e) => {
+                debug!("[docs] {url} request error: {e}");
+                continue;
+            }
+        };
+        if !resp.status().is_success() {
+            debug!("[docs] {url} → {}", resp.status());
+            continue;
+        }
+        debug!("[docs] {url} → 200, parsing");
         let body = resp.text().await.unwrap_or_default();
-        error!(
-            "[docs] docs search underscore failed: {} {}",
-            status, url_underscore
-        );
-        error!(
-            "[docs] docs search underscore body: {}",
-            body.lines().take(8).collect::<Vec<_>>().join("\n")
-        );
+        match parse_search_data(&body) {
+            Ok(data) if !data.items.is_empty() => {
+                info!(
+                    "[docs] resolved via direct candidate {url} items={}",
+                    data.items.len()
+                );
+                return Ok(map_search_items(data));
+            }
+            Ok(_) => debug!("[docs] {url} parsed but empty, continuing"),
+            Err(e) => debug!("[docs] {url} parse failed ({e}), continuing"),
+        }
+    }
 
-        resp = c.get(&url_hyphen).send().await?;
-        let url2 = resp.url().clone();
-        if resp.status().is_success() {
-            debug!("[docs] docs search fetched hyphen url={}", url2);
-        } else {
-            let status2 = resp.status();
-            let body2 = resp.text().await.unwrap_or_default();
-            error!("[docs] docs search hyphen failed: {} {}", status2, url2);
-            error!(
-                "[docs] docs search hyphen body: {}",
-                body2.lines().take(8).collect::<Vec<_>>().join("\n")
-            );
+    // ── Step 2: HTML discovery ────────────────────────────────────────────────
+    let search_html_url = format!("{base}search.html");
+    info!("[docs] direct candidates exhausted, trying HTML discovery at {search_html_url}");
 
-            let search_html_url = format!("https://hexdocs.pm/{package}/search.html");
-            let page_resp = c.get(&search_html_url).send().await;
-            let fallback_resp = if let Ok(page_resp) = page_resp {
-                if page_resp.status().is_success() {
-                    let page_body = page_resp.text().await.unwrap_or_default();
-                    if let Some(search_url) = find_search_index_url(&search_html_url, &page_body) {
-                        let fallback_resp = c.get(&search_url).send().await?;
-                        let fallback_url = fallback_resp.url().clone();
-                        if fallback_resp.status().is_success() {
-                            debug!("[docs] docs search fetched fallback url={}", fallback_url);
-                            Some(fallback_resp)
-                        } else {
-                            let status3 = fallback_resp.status();
-                            let body3 = fallback_resp.text().await.unwrap_or_default();
-                            error!(
-                                "[docs] docs search fallback failed: {} {}",
-                                status3, fallback_url
+    let page_resp = c.get(&search_html_url).send().await;
+    let page_body = match page_resp {
+        Ok(r) if r.status().is_success() => r.text().await.unwrap_or_default(),
+        Ok(r) => {
+            debug!("[docs] search.html → {}", r.status());
+            String::new()
+        }
+        Err(e) => {
+            debug!("[docs] search.html request error: {e}");
+            String::new()
+        }
+    };
+
+    if !page_body.is_empty() {
+        // 2a: linked asset discovered from <script src="...">
+        if let Some(asset_url) = find_search_index_url(&search_html_url, &page_body) {
+            info!("[docs] HTML discovery found asset {asset_url}");
+            match c.get(&asset_url).send().await {
+                Ok(r) if r.status().is_success() => {
+                    let body = r.text().await.unwrap_or_default();
+                    match parse_search_data(&body) {
+                        Ok(data) if !data.items.is_empty() => {
+                            info!(
+                                "[docs] resolved via HTML asset {asset_url} items={}",
+                                data.items.len()
                             );
-                            error!(
-                                "[docs] docs search fallback body: {}",
-                                body3.lines().take(8).collect::<Vec<_>>().join("\n")
-                            );
-                            None
+                            return Ok(map_search_items(data));
                         }
-                    } else if page_body.contains("searchData") {
-                        let data: SearchData = parse_search_data(&page_body)?;
-                        return Ok(data
-                            .items
-                            .into_iter()
-                            .map(|r| SearchItem {
-                                item_type: r.item_type,
-                                title: r.title,
-                                parent_title: r.parent_title,
-                                doc_text: strip_html(&r.doc),
-                                ref_url: r.ref_url,
-                            })
-                            .collect());
-                    } else {
-                        None
+                        Ok(_) => debug!("[docs] HTML asset empty"),
+                        Err(e) => debug!("[docs] HTML asset parse failed: {e}"),
                     }
-                } else {
-                    None
                 }
-            } else {
-                None
-            };
+                Ok(r) => debug!("[docs] HTML asset → {}", r.status()),
+                Err(e) => debug!("[docs] HTML asset request error: {e}"),
+            }
+        }
 
-            if let Some(fallback_resp) = fallback_resp {
-                resp = fallback_resp;
-            } else {
-                return Err(anyhow::anyhow!(
-                    "docs search failed for underscore, hyphen, and HTML fallback variants"
-                ));
+        // 2b: inline searchData embedded directly in the HTML page
+        if page_body.contains("searchData") {
+            match parse_search_data(&page_body) {
+                Ok(data) if !data.items.is_empty() => {
+                    info!(
+                        "[docs] resolved via inline searchData items={}",
+                        data.items.len()
+                    );
+                    return Ok(map_search_items(data));
+                }
+                Ok(_) => debug!("[docs] inline searchData empty"),
+                Err(e) => debug!("[docs] inline searchData parse failed: {e}"),
             }
         }
     }
 
-    let url = resp.url().clone();
-    let status = resp.status();
-    let body = resp.text().await?;
-    debug!(
-        "[docs] docs search response {} {} body_len={}",
-        status,
-        url,
-        body.len()
-    );
-    let data: SearchData = parse_search_data(&body)?;
-    Ok(data
-        .items
+    error!("[docs] all strategies failed for package={package}");
+    Err(anyhow::anyhow!(
+        "docs search index not found for '{package}' — tried direct candidates and HTML discovery"
+    ))
+}
+
+fn map_search_items(data: SearchData) -> Vec<SearchItem> {
+    data.items
         .into_iter()
         .map(|r| SearchItem {
             item_type: r.item_type,
@@ -668,32 +677,39 @@ pub async fn fetch_docs_search_data(package: &str) -> Result<Vec<SearchItem>> {
             doc_text: strip_html(&r.doc),
             ref_url: r.ref_url,
         })
-        .collect())
+        .collect()
 }
 
+/// Parse an ExDoc search payload from either:
+/// - **Pure JSON**: `{"items":[...]}`  (`.json` files)
+/// - **JS assignment**: `searchData = {"items":[...]}` or `var searchData={...};`  (`.js` files / inline)
 fn parse_search_data(body: &str) -> Result<SearchData> {
     let body = body.trim();
-    let start = body.find("searchData").unwrap_or_default();
 
-    let tail = if start > 0 {
-        &body[start + "searchData".len()..]
-    } else {
-        body
-    };
-    let tail = tail.trim_start();
-    let json_start = if let Some(eq_pos) = tail.find('=') {
-        tail[eq_pos + 1..].trim_start()
-    } else {
-        tail
-    };
+    // Case 1: pure JSON — starts with `{` directly.
+    // Do NOT use find('=') here: `=` appears inside string values (URLs, Gleam
+    // `key=value` patterns) and would slice the JSON at the wrong position.
+    if body.starts_with('{') {
+        return serde_json::from_str(body).context("parsing docs search data as JSON");
+    }
 
-    let json_text = if json_start.starts_with('{') {
-        extract_json_object(json_start)
-    } else {
-        json_start.trim_end_matches(';').trim()
-    };
+    // Case 2: JS assignment — `searchData = { ... };`
+    // Only search for `=` *after* the `searchData` keyword, not in the whole body.
+    if let Some(kw_pos) = body.find("searchData") {
+        let after_kw = body[kw_pos + "searchData".len()..].trim_start();
+        if let Some(eq_pos) = after_kw.find('=') {
+            let json_part = after_kw[eq_pos + 1..].trim_start();
+            if json_part.starts_with('{') {
+                let json_text = extract_json_object(json_part);
+                return serde_json::from_str(json_text)
+                    .context("parsing docs search data from JS assignment");
+            }
+        }
+    }
 
-    serde_json::from_str(json_text).context("parsing docs search response")
+    Err(anyhow::anyhow!(
+        "no parseable search data found in response"
+    ))
 }
 
 fn extract_json_object(s: &str) -> &str {
@@ -726,17 +742,25 @@ fn extract_json_object(s: &str) -> &str {
     s.trim_end_matches(';').trim()
 }
 
+/// Scan `html` for `<script src="...">` attributes that look like ExDoc search assets.
+/// Returns the first matching absolute URL resolved against `base_url`.
 fn find_search_index_url(base_url: &str, html: &str) -> Option<String> {
     let base = Url::parse(base_url).ok()?;
+    // Candidates covering both JSON and JS variants across ExDoc versions.
     let candidates = [
         "dist/search_data-",
         "dist/search-data-",
         "search_data.json",
         "search-data.json",
+        "search_data.js",
+        "search-data.js",
+        "dist/search_data.js",
+        "dist/search-data.js",
         "search.json",
         "search-index.json",
     ];
 
+    // Pass 1: walk every `src="..."` attribute and match against candidates.
     let mut start = 0;
     while let Some(src_pos) = html[start..].find("src=") {
         let src_pos = start + src_pos + "src=".len();
@@ -751,17 +775,19 @@ fn find_search_index_url(base_url: &str, html: &str) -> Option<String> {
         let trimmed = &trimmed[1..];
         if let Some(end_quote) = trimmed.find(quote) {
             let path = &trimmed[..end_quote];
-            if candidates.iter().any(|candidate| path.contains(candidate)) {
+            if candidates.iter().any(|c| path.contains(c)) {
                 if let Ok(url) = base.join(path) {
                     return Some(url.into());
                 }
             }
             start = src_pos + 1 + end_quote;
-            continue;
+        } else {
+            break;
         }
-        break;
     }
 
+    // Pass 2: search for candidate strings anywhere in the HTML and extract
+    // the surrounding quoted path.
     for candidate in candidates {
         let mut start = 0;
         while let Some(pos) = html[start..].find(candidate) {
@@ -784,4 +810,97 @@ fn extract_quoted_path(html: &str, pos: usize) -> Option<String> {
     let suffix = &html[pos..];
     let end = suffix.find(quote)?;
     Some(html[quote_pos + 1..pos + end].to_string())
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── parse_search_data ─────────────────────────────────────────────────────
+
+    fn item(type_: &str, title: &str, ref_: &str) -> String {
+        format!(
+            r#"{{"type":"{type_}","title":"{title}","parentTitle":"","doc":"","ref":"{ref_}"}}"#
+        )
+    }
+
+    fn wrap(items: &str) -> String {
+        format!(r#"{{"items":[{items}]}}"#)
+    }
+
+    #[test]
+    fn parse_pure_json() {
+        let json = wrap(&item("function", "add/2", "Math.html#add/2"));
+        let data = parse_search_data(&json).unwrap();
+        assert_eq!(data.items.len(), 1);
+        assert_eq!(data.items[0].title, "add/2");
+    }
+
+    #[test]
+    fn parse_pure_json_with_equals_in_values() {
+        // Regression: `=` inside string values must not confuse the parser.
+        let json = wrap(&item("function", "query_param=value", "Mod.html#f/1"));
+        let data = parse_search_data(&json).unwrap();
+        assert_eq!(data.items.len(), 1);
+        assert_eq!(data.items[0].title, "query_param=value");
+    }
+
+    #[test]
+    fn parse_js_assignment() {
+        let body = format!(
+            r#"var searchData={};"#,
+            wrap(&item("module", "MyMod", "MyMod.html"))
+        );
+        let data = parse_search_data(&body).unwrap();
+        assert_eq!(data.items.len(), 1);
+        assert_eq!(data.items[0].title, "MyMod");
+    }
+
+    #[test]
+    fn parse_js_assignment_with_spaces() {
+        let body = format!(r#"searchData = {};"#, wrap(&item("type", "T", "T.html")));
+        let data = parse_search_data(&body).unwrap();
+        assert_eq!(data.items.len(), 1);
+    }
+
+    // ── find_search_index_url ─────────────────────────────────────────────────
+
+    #[test]
+    fn find_url_from_script_src_json() {
+        // src path relative to search.html in the same directory
+        let html = r#"<script src="search_data.json"></script>"#;
+        let url = find_search_index_url("https://hexdocs.pm/gleam_stdlib/search.html", html);
+        assert_eq!(
+            url.as_deref(),
+            Some("https://hexdocs.pm/gleam_stdlib/search_data.json")
+        );
+    }
+
+    #[test]
+    fn find_url_from_script_src_js() {
+        let html = r#"<script defer="defer" src="dist/search_data-abc123.js"></script>"#;
+        let url = find_search_index_url("https://hexdocs.pm/lustre/search.html", html);
+        assert!(url.is_some());
+        assert!(url.unwrap().contains("dist/search_data-abc123.js"));
+    }
+
+    #[test]
+    fn find_url_prefers_src_attribute() {
+        // src= pass runs before the substring pass, so the <script> wins.
+        let html = r#"<link href="search-data.json"><script src="search-data.js"></script>"#;
+        let url = find_search_index_url("https://hexdocs.pm/pkg/search.html", html);
+        assert_eq!(
+            url.as_deref(),
+            Some("https://hexdocs.pm/pkg/search-data.js")
+        );
+    }
+
+    #[test]
+    fn find_url_returns_none_for_unrelated_html() {
+        let html = r#"<html><body><p>No search here.</p></body></html>"#;
+        let url = find_search_index_url("https://hexdocs.pm/pkg/search.html", html);
+        assert!(url.is_none());
+    }
 }
