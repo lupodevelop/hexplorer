@@ -15,6 +15,7 @@ mod api;
 mod app;
 mod args;
 mod cache;
+mod docs;
 mod export_types;
 mod favorites;
 mod fmt;
@@ -187,7 +188,7 @@ async fn run_tui(args: Args) -> Result<()> {
     execute!(stdout, EnterAlternateScreen)?;
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout))?;
 
-    let result = event_loop(&mut terminal, &mut application, &mut rx).await;
+    let result = event_loop(&mut terminal, &mut application, &mut rx);
 
     // Always restore terminal, even on error.
     let _ = disable_raw_mode();
@@ -200,7 +201,7 @@ async fn run_tui(args: Args) -> Result<()> {
     result
 }
 
-async fn event_loop(
+fn event_loop(
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     app: &mut app::App,
     rx: &mut mpsc::Receiver<app::Msg>,
@@ -216,10 +217,8 @@ async fn event_loop(
         // Wait up to 50ms for an event, then re-draw (handles async updates and resize).
         if event::poll(std::time::Duration::from_millis(50))? {
             match event::read()? {
-                Event::Key(key) => {
-                    if key.kind == KeyEventKind::Press && app.on_key(key) {
-                        break;
-                    }
+                Event::Key(key) if key.kind == KeyEventKind::Press && app.on_key(key) => {
+                    break;
                 }
                 Event::Resize(_, _) => {} // next loop iteration redraws
                 _ => {}
