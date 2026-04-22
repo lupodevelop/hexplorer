@@ -10,7 +10,8 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::api::{GithubStats, SearchItem};
+use crate::api::GithubStats;
+use crate::docs::SearchItem;
 
 // ── TTL ───────────────────────────────────────────────────────────────────────
 
