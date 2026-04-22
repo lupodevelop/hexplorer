@@ -217,10 +217,10 @@ fn event_loop(
         // Wait up to 50ms for an event, then re-draw (handles async updates and resize).
         if event::poll(std::time::Duration::from_millis(50))? {
             match event::read()? {
-                Event::Key(key) => {
-                    if key.kind == KeyEventKind::Press && app.on_key(key) {
-                        break;
-                    }
+                Event::Key(key)
+                    if key.kind == KeyEventKind::Press && app.on_key(key) =>
+                {
+                    break;
                 }
                 Event::Resize(_, _) => {} // next loop iteration redraws
                 _ => {}

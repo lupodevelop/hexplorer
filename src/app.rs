@@ -964,10 +964,8 @@ impl App {
             KeyCode::Backspace => {
                 self.input.pop();
             }
-            KeyCode::Char(c) => {
-                if self.input.len() < 200 {
-                    self.input.push(c);
-                }
+            KeyCode::Char(c) if self.input.len() < 200 => {
+                self.input.push(c);
             }
             _ => {}
         }
@@ -1007,24 +1005,20 @@ impl App {
             KeyCode::PageDown => self.nav(10),
             KeyCode::PageUp => self.nav(-10),
 
-            KeyCode::Enter => {
-                if !self.packages.is_empty() {
-                    self.view = View::Detail;
-                    self.scroll = 0;
-                    self.link_cursor = None;
-                    self.ensure_gh_stats();
-                    self.ensure_pkg_detail();
-                }
+            KeyCode::Enter if !self.packages.is_empty() => {
+                self.view = View::Detail;
+                self.scroll = 0;
+                self.link_cursor = None;
+                self.ensure_gh_stats();
+                self.ensure_pkg_detail();
             }
-            KeyCode::Char('r') => {
-                if !self.loading {
-                    self.pkg_cache.clear();
-                    self.from_cache = false;
-                    if self.favorites_mode {
-                        self.load_favorites();
-                    } else {
-                        self.load();
-                    }
+            KeyCode::Char('r') if !self.loading => {
+                self.pkg_cache.clear();
+                self.from_cache = false;
+                if self.favorites_mode {
+                    self.load_favorites();
+                } else {
+                    self.load();
                 }
             }
             _ => {}
