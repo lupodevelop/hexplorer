@@ -19,6 +19,13 @@ use crate::{
     types::{ColorScheme, Language, LinkStyle, SettingRow, Sort, View},
 };
 
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+/// Maximum number of doc search results shown in the list at any time.
+/// `docs_search_all_results` holds the full unfiltered set; this cap applies
+/// only to the visible slice (`docs_search_results`).
+const DOCS_DISPLAY_LIMIT: usize = 200;
+
 // ── Type aliases ─────────────────────────────────────────────────────────────
 
 type PkgCacheKey = (String, String, Language, u32);
@@ -55,10 +62,12 @@ pub enum Msg {
     GhFetched(String, GhResult), // (repo_url, result)
     /// Single-package detail fetch result: (package_name, versions_newest_first).
     DetailLoaded(String, Vec<String>),
+    /// Single-package detail fetch failed (non-critical — detail view degrades gracefully).
+    DetailError(String),
     /// HexDocs search index fetch result: (query_term, filtered_results).
     DocsSearchLoaded(String, Vec<SearchItem>),
-    /// HexDocs search error: (query_term, error_message).
-    DocsSearchError(String, String),
+    /// HexDocs search error.
+    DocsSearchError(String),
     Err(String),
 }
 
@@ -146,6 +155,7 @@ pub struct App {
 
 impl App {
     pub fn new(tx: Sender<Msg>, language: Language) -> Self {
+        let meta_config = storage::load_meta().map(|m| m.config).unwrap_or_default();
         Self {
             view: View::List,
             language,
@@ -164,13 +174,8 @@ impl App {
             token: github_token(),
             favorites: favorites::load(),
             favorites_mode: false,
-            color_scheme: storage::load_meta()
-                .as_ref()
-                .map(|m| m.config.color_scheme)
-                .unwrap_or_default(),
-            link_style: storage::load_meta()
-                .map(|m| m.config.link_style)
-                .unwrap_or_default(),
+            color_scheme: meta_config.color_scheme,
+            link_style: meta_config.link_style,
             settings_cursor: 0,
             settings_editing: false,
             settings_input: String::new(),
@@ -190,9 +195,7 @@ impl App {
             docs_search_error: None,
             prev_view: View::List,
             prev_input: String::new(),
-            docs_cache_ttl_hours: storage::load_meta()
-                .map(|m| m.config.docs_cache_ttl_hours)
-                .unwrap_or(24),
+            docs_cache_ttl_hours: meta_config.docs_cache_ttl_hours,
             tx,
             fetch_gen: 0,
         }
@@ -252,11 +255,13 @@ impl App {
         self.detail_loading = true;
         let tx = self.tx.clone();
         tokio::spawn(async move {
-            if let Ok(full) = fetch_package(&name).await {
-                let _ = tx.send(Msg::DetailLoaded(name, full.versions)).await;
-            } else {
-                // Silently swallow errors — detail view degrades gracefully.
-                let _ = tx.send(Msg::DetailLoaded(String::new(), vec![])).await;
+            match fetch_package(&name).await {
+                Ok(full) => {
+                    let _ = tx.send(Msg::DetailLoaded(name, full.versions)).await;
+                }
+                Err(e) => {
+                    let _ = tx.send(Msg::DetailError(e.to_string())).await;
+                }
             }
         });
     }
@@ -343,6 +348,10 @@ impl App {
                     pkg.versions = versions;
                 }
             }
+            Msg::DetailError(e) => {
+                warn!("[msg] DetailError: {e}");
+                self.detail_loading = false;
+            }
             Msg::DocsSearchLoaded(term, results) => {
                 info!(
                     "[msg] DocsSearchLoaded query={term:?} results={}",
@@ -353,7 +362,7 @@ impl App {
                 self.docs_search_all_results = results;
                 self.apply_docs_filter();
             }
-            Msg::DocsSearchError(_term, error) => {
+            Msg::DocsSearchError(error) => {
                 error!("[msg] DocsSearchError: {error}");
                 self.docs_search_loading = false;
                 self.docs_search_results.clear();
@@ -400,6 +409,18 @@ impl App {
     pub fn preview_gh(&self) -> Option<&CachedEntry> {
         let repo = self.selected()?.repo_url.as_deref()?;
         cache::get_any(&self.cache, repo)
+    }
+
+    /// Number of available links (docs, hex, repo) for the selected package.
+    fn link_count(&self) -> usize {
+        self.selected()
+            .map(|pkg| {
+                [&pkg.docs_url, &pkg.hex_url, &pkg.repo_url]
+                    .iter()
+                    .filter(|u| u.is_some())
+                    .count()
+            })
+            .unwrap_or(0)
     }
 
     // ── Settings ──────────────────────────────────────────────────────────────
@@ -488,6 +509,7 @@ impl App {
                 SettingRow::LinkStyle => {}
                 SettingRow::DefaultLanguage => {}
                 SettingRow::DocsCacheTtl => {}
+                SettingRow::LogRetentionDays => {}
             },
 
             // `d` on the token row clears it.
@@ -552,6 +574,24 @@ impl App {
                 } else {
                     self.settings_config.default_language.cycle()
                 };
+                self.persist_settings_config();
+            }
+
+            // ← / → cycle log retention through presets.
+            KeyCode::Left | KeyCode::Right
+                if rows.get(self.settings_cursor) == Some(&SettingRow::LogRetentionDays) =>
+            {
+                const PRESETS: &[u32] = &[0, 1, 3, 7, 14, 30, 90];
+                let pos = PRESETS
+                    .iter()
+                    .position(|&d| d == self.settings_config.log_retention_days);
+                let cur = pos.unwrap_or(3); // default to 7-day slot
+                let next = if key.code == KeyCode::Left {
+                    cur.saturating_sub(1)
+                } else {
+                    (cur + 1).min(PRESETS.len() - 1)
+                };
+                self.settings_config.log_retention_days = PRESETS[next];
                 self.persist_settings_config();
             }
 
@@ -696,13 +736,17 @@ impl App {
     // ── Navigation ────────────────────────────────────────────────────────────
 
     fn nav(&mut self, delta: i32) {
-        if self.packages.is_empty() {
+        let len = self.packages.len();
+        if len == 0 {
             return;
         }
-        let n = self.packages.len() as i32;
-        let cur = self.list_state.selected().unwrap_or(0) as i32;
-        let nxt = (cur + delta).clamp(0, n - 1) as usize;
-        if nxt != cur as usize {
+        let cur = self.list_state.selected().unwrap_or(0);
+        let nxt = if delta < 0 {
+            cur.saturating_sub(delta.unsigned_abs() as usize)
+        } else {
+            (cur + delta.unsigned_abs() as usize).min(len - 1)
+        };
+        if nxt != cur {
             self.list_state.select(Some(nxt));
         }
     }
@@ -731,15 +775,15 @@ impl App {
         let ttl = self.docs_cache_ttl_hours;
         if let Some(cached_items) = cache::get_docs(&pkg_name, ttl) {
             let q = term.to_lowercase();
+            // Store ALL matching items — the display cap is applied by apply_docs_filter.
             self.docs_search_all_results = cached_items
                 .into_iter()
                 .filter(|item| {
                     item.title.to_lowercase().contains(&q)
                         || item.doc_text.to_lowercase().contains(&q)
                 })
-                .take(50)
                 .collect();
-            self.docs_search_results = self.docs_search_all_results.clone();
+            self.apply_docs_filter();
             self.docs_search_loading = false;
             return;
         }
@@ -751,18 +795,18 @@ impl App {
                 Ok(items) => {
                     cache::insert_docs(&pkg_name, &items, ttl);
                     let q = term.to_lowercase();
+                    // Send ALL matching items — the display cap is applied by apply_docs_filter.
                     let results = items
                         .into_iter()
                         .filter(|item| {
                             item.title.to_lowercase().contains(&q)
                                 || item.doc_text.to_lowercase().contains(&q)
                         })
-                        .take(50)
                         .collect();
                     let _ = tx.send(Msg::DocsSearchLoaded(term, results)).await;
                 }
                 Err(e) => {
-                    let _ = tx.send(Msg::DocsSearchError(term, e.to_string())).await;
+                    let _ = tx.send(Msg::DocsSearchError(e.to_string())).await;
                 }
             }
         });
@@ -821,18 +865,26 @@ impl App {
     /// and update `docs_search_results`. Resets the cursor to 0.
     fn apply_docs_filter(&mut self) {
         let q = self.input.trim().to_lowercase();
-        self.docs_search_results = if q.is_empty() {
-            self.docs_search_all_results.clone()
+        if q.is_empty() {
+            // No active filter — reference the full set via indices to avoid cloning.
+            self.docs_search_results = self
+                .docs_search_all_results
+                .iter()
+                .take(DOCS_DISPLAY_LIMIT)
+                .cloned()
+                .collect();
         } else {
-            self.docs_search_all_results
+            self.docs_search_results = self
+                .docs_search_all_results
                 .iter()
                 .filter(|item| {
                     item.title.to_lowercase().contains(&q)
                         || item.parent_title.to_lowercase().contains(&q)
                 })
+                .take(DOCS_DISPLAY_LIMIT)
                 .cloned()
-                .collect()
-        };
+                .collect();
+        }
         self.docs_search_cursor = 0;
     }
 
@@ -1000,15 +1052,7 @@ impl App {
                 self.scroll = self.scroll.saturating_sub(10);
             }
             KeyCode::Tab => {
-                let count = self
-                    .selected()
-                    .map(|pkg| {
-                        [&pkg.docs_url, &pkg.hex_url, &pkg.repo_url]
-                            .iter()
-                            .filter(|u| u.is_some())
-                            .count()
-                    })
-                    .unwrap_or(0);
+                let count = self.link_count();
                 if count > 0 {
                     self.link_cursor = Some(match self.link_cursor {
                         None => 0,
@@ -1017,15 +1061,7 @@ impl App {
                 }
             }
             KeyCode::BackTab => {
-                let count = self
-                    .selected()
-                    .map(|pkg| {
-                        [&pkg.docs_url, &pkg.hex_url, &pkg.repo_url]
-                            .iter()
-                            .filter(|u| u.is_some())
-                            .count()
-                    })
-                    .unwrap_or(0);
+                let count = self.link_count();
                 if count > 0 {
                     self.link_cursor = Some(match self.link_cursor {
                         None | Some(0) => count - 1,
