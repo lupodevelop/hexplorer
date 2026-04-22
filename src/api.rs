@@ -245,8 +245,12 @@ async fn fetch_page(search: &str, sort: &str, page: u32) -> Result<Vec<Package>>
 /// Sort a package list client-side by the HEX.pm sort param string.
 fn sort_packages(packages: &mut [Package], sort: &str) {
     match sort {
-        "recent_downloads" => packages.sort_by(|a, b| b.downloads_recent.cmp(&a.downloads_recent)),
-        "downloads" => packages.sort_by(|a, b| b.downloads_all.cmp(&a.downloads_all)),
+        "recent_downloads" => {
+            packages.sort_by_key(|p| std::cmp::Reverse(p.downloads_recent));
+        }
+        "downloads" => {
+            packages.sort_by_key(|p| std::cmp::Reverse(p.downloads_all));
+        }
         "updated_at" => packages.sort_by(|a, b| b.updated_at.cmp(&a.updated_at)),
         "inserted_at" => packages.sort_by(|a, b| b.inserted_at.cmp(&a.inserted_at)),
         "name" => packages.sort_by(|a, b| a.name.cmp(&b.name)),

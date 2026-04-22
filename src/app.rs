@@ -464,10 +464,8 @@ impl App {
                 KeyCode::Backspace => {
                     self.settings_input.pop();
                 }
-                KeyCode::Char(c) => {
-                    if self.settings_input.len() < 256 {
-                        self.settings_input.push(c);
-                    }
+                KeyCode::Char(c) if self.settings_input.len() < 256 => {
+                    self.settings_input.push(c);
                 }
                 _ => {}
             }
@@ -821,11 +819,9 @@ impl App {
                 self.input = self.prev_input.clone();
             }
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => return true,
-            KeyCode::Down | KeyCode::Char('j') => {
-                if !self.docs_search_results.is_empty() {
-                    self.docs_search_cursor =
-                        (self.docs_search_cursor + 1).min(self.docs_search_results.len() - 1);
-                }
+            KeyCode::Down | KeyCode::Char('j') if !self.docs_search_results.is_empty() => {
+                self.docs_search_cursor =
+                    (self.docs_search_cursor + 1).min(self.docs_search_results.len() - 1);
             }
             KeyCode::Up | KeyCode::Char('k') => {
                 self.docs_search_cursor = self.docs_search_cursor.saturating_sub(1);
@@ -908,10 +904,8 @@ impl App {
             KeyCode::Backspace => {
                 self.docs_search_input.pop();
             }
-            KeyCode::Char(c) => {
-                if self.docs_search_input.len() < 200 {
-                    self.docs_search_input.push(c);
-                }
+            KeyCode::Char(c) if self.docs_search_input.len() < 200 => {
+                self.docs_search_input.push(c);
             }
             _ => {}
         }
