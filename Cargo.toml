@@ -1,6 +1,6 @@
 [package]
 name = "hexplorer"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2021"
 authors = ["lupodevelop <you@example.com>"]
 description = "Terminal UI for browsing HEX.pm package registry for the BEAM ecosystem"
