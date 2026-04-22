@@ -840,6 +840,25 @@ fn draw_settings_view(f: &mut Frame, app: &App, area: Rect) {
         Span::styled("  ← →", Style::new().fg(p.dim).italic()),
     ]));
 
+    // log retention row
+    let is_lr = rows[cursor] == SettingRow::LogRetentionDays;
+    let (pre, col) = if is_lr {
+        ("▶  ", ac)
+    } else {
+        ("   ", p.white)
+    };
+    let lr_val = match app.settings_config.log_retention_days {
+        0 => "off".to_string(),
+        1 => "1 day".to_string(),
+        d => format!("{d} days"),
+    };
+    lines.push(Line::from(vec![
+        Span::styled(pre, Style::new().fg(ac).bold()),
+        Span::styled("log retain  ", Style::new().fg(p.dim)),
+        Span::styled(lr_val, Style::new().fg(col).bold()),
+        Span::styled("  ← →", Style::new().fg(p.dim).italic()),
+    ]));
+
     // gh cache row
     let is_gc = rows[cursor] == SettingRow::ClearGhCache;
     let (pre, col) = if is_gc {
