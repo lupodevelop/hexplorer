@@ -3,6 +3,30 @@
 All notable changes to hexplorer are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.7] — 2026-04-22
+
+### Added
+
+- **`SearchItem` carries `source` and `package` fields** — `source: SearchSource` (Remote | Local) and `package: String` are now embedded in every doc search result. Remote results are tagged `SearchSource::Remote`; the field is ready for future local ingestion (`SearchSource::Local`).
+- **`src/docs.rs` module** — all HexDocs types, fetch logic, parse cascade, and HTML helpers extracted from `api.rs` into a dedicated module. Single responsibility, easier to extend for local ingest.
+- **HTML entity decoding in doc snippets** — `strip_html` now decodes named entities (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&nbsp;`, `&mdash;`, `&ndash;`, `&hellip;`) and numeric entities (decimal `&#8212;` and hex `&#x2014;`). Previously raw entities were displayed verbatim in the search results pane.
+- **Log retention in settings screen** — the `?` settings screen now includes a `log retain` row. `←`/`→` cycle through presets: off · 1 day · 3 days · 7 days · 14 days · 30 days · 90 days. Previously configurable only via `hexplorer storage config log_retention_days=N`.
+
+### Fixed
+
+- **Detail fetch errors no longer silently discarded** — when `ensure_pkg_detail` fails, a `Msg::DetailError` is sent and logged; the previous behaviour sent an empty `DetailLoaded` that matched no package and dropped the error on the floor.
+- **`DocsSearchError` had a dead first field** — the `(term, message)` tuple was reduced to `(message)` since the term was never used in the handler.
+- **HexDocs search result cap raised and applied correctly** — results were capped at 50 inside `open_docs_search`, meaning the live filter could only narrow an already-truncated set. `docs_search_all_results` now holds all matches (no cap); the display limit (`DOCS_DISPLAY_LIMIT = 200`) is applied only to the visible slice in `apply_docs_filter`. For large packages (e.g. Phoenix, Plug) the live filter now surfaces correct results across the full match set.
+- **`apply_docs_filter` avoided an unnecessary clone** — when the live filter input is empty the previous code cloned the entire result list on every keystroke; it now uses an iterator slice instead.
+
+### Internal
+
+- `App::new()` called `storage::load_meta()` three times; now loads once and fans out.
+- `key_detail()` Tab / BackTab had duplicate link-count logic; extracted to `link_count()` helper.
+- `event_loop` in `main.rs` was declared `async` but contained no `.await` expressions; keyword removed.
+- `nav()` replaced unsafe `usize ↔ i32` casts with `unsigned_abs()` + `saturating_sub`.
+- 17 new unit tests: HTML entity decoding (11), `SearchItem` serialisation (2), `map_search_items` source/package (1), parse/URL discovery already in `docs::tests` (3 moved from `api`).
+
 ## [0.1.6] — 2026-04-07
 
 ### Added
@@ -45,6 +69,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.1.3] — 2026-04-03
 
 ### Added
+
 - `hexplorer storage config default_language=<gleam|elixir|erlang|all>` to persist startup language.
 - `?` settings screen now includes a `default_language` row and `color_scheme` row with `←`/`→` to cycle values.
 - `Ctrl+W` / `Ctrl+Backspace` now delete the previous word in search mode and in the GitHub token input field.
@@ -52,6 +77,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Settings screen: new `link_style` row (under Appearance) cycles between `Cursor ▶` (vim-like marker) and `Block ■` (solid accent-color background on the selected link row). Setting persists to `meta.json`.
 
 ### Changed
+
 - `hexplorer` now loads `default_language` from `~/.cache/hexplorer/meta.json` when `--lang` is not explicitly passed.
 - UI now persistently loads selected color scheme from storage meta.
 
@@ -62,11 +88,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.1.2] — 2026-04-02
 
 ### Changed
+
 - README URLs and installation examples updated to use `lupodevelop` and current commit-based raw asset paths.
 
 ## [0.1.1] — 2026-04-02
 
 ### Fixed
+
 - `ptr_arg`: `sort_packages` now accepts `&mut [Package]` instead of `&mut Vec<Package>`
 - `manual_flatten`: replaced `if let Ok(pkgs)` in the loop with `.into_iter().flatten()`
 - `derivable_impls`: manual `impl Default for Args` replaced with `#[derive(Default)]`
@@ -74,10 +102,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `print_literal`: en-dash `–` inlined in `println!` format string
 - `match_result_ok`: `if let Some(x) = y.ok()` replaced with `if let Ok(x) = y`
 
-
 ## [0.1.0] — 2026-03-22
 
 ### Added
+
 - Interactive TUI for browsing HEX.pm packages (Gleam, Elixir, Erlang, All BEAM tabs)
 - Full-text search across name + description, filtered by ecosystem
 - Detail view with GitHub stars, forks, open issues (live fetch + 6h disk cache)
@@ -86,6 +114,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `GITHUB_TOKEN` support to raise API rate limit from 60 to 5 000 req/h
 
 ### Technical
+
 - Language-specific search fetches up to 5 pages in parallel (~500 packages) for full-ecosystem coverage
 - All BEAM mode fetches Gleam + Elixir + Erlang concurrently, merges and assigns correct language badges client-side
 - Fetch generation counter prevents stale results from overwriting newer fetches

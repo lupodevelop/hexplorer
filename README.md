@@ -120,6 +120,8 @@ hexplorer --log-file /tmp/hexplorer.log          # write diagnostics to a custom
 | `Esc` / `q` | Back to previous view |
 | `↑↓` `j k` | Navigate results |
 | `Enter` | Open result in system browser |
+| any text | Live-filter the loaded results |
+| `Backspace` / `Ctrl+W` | Delete filter character / word |
 
 ## GitHub stats
 
@@ -169,6 +171,8 @@ Press `D` from the list view (or `s` from the detail view) to search the documen
 
 Results show the item type (`value`, `module`, `page`, `type`, `callback`), title, parent module, a doc snippet, and the target URL. Press `Enter` to open the exact page in your system browser.
 
+After results load, type to narrow them in real time. The live filter searches title and parent module across the full match set (up to 200 results shown at a time).
+
 The search index is cached to disk (default 24h TTL). Configure the TTL via `?` → settings → `docs cache`.
 
 ## Diagnostics logging
@@ -181,7 +185,7 @@ hexplorer writes a daily log file to:
 
 Logs cover startup arguments and config, system information (OS, CPU, RAM), every key event with current view, view transitions, async message flow (fetch gen, result counts), all API requests with status codes, and errors. They are useful for diagnosing rendering or fetch issues.
 
-Log files are pruned automatically at startup. Default retention is **7 days**. Change it:
+Log files are pruned automatically at startup. Default retention is **7 days**. Change it via the settings screen (`?` → `log retain`, `←`/`→`) or from the command line:
 
 ```sh
 hexplorer storage config log_retention_days=14   # keep 14 days
