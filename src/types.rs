@@ -227,6 +227,7 @@ pub enum SettingRow {
     KeepWeeks,
     Compress,
     DocsCacheTtl,
+    LogRetentionDays,
     ClearGhCache,
 }
 
@@ -240,6 +241,7 @@ impl SettingRow {
             Self::KeepWeeks,
             Self::Compress,
             Self::DocsCacheTtl,
+            Self::LogRetentionDays,
             Self::ClearGhCache,
         ]
     }
