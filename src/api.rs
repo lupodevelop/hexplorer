@@ -74,7 +74,7 @@ pub struct Package {
 
 // ── HexDocs search types (re-exported from docs module) ──────────────────────
 
-pub use crate::docs::{fetch_docs_search_data, SearchItem};
+pub use crate::docs::{docs_base_url, fetch_docs_search_data, SearchItem};
 
 // ── GitHub types ──────────────────────────────────────────────────────────────
 

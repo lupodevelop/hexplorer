@@ -6,6 +6,7 @@ use ratatui::{
 };
 
 use crate::{
+    api::docs_base_url,
     app::{App, GhState},
     fmt,
     types::{Language, LinkStyle, Palette, SettingRow, View},
@@ -988,7 +989,7 @@ fn draw_docs_search_view(f: &mut Frame, app: &App, area: Rect) {
                 }
                 acc
             });
-        let url = format!("https://hexdocs.pm/{pkg}/{}", item.ref_url);
+        let url = format!("{}{}", docs_base_url(pkg), item.ref_url);
         let lines = vec![
             Line::from(Span::styled(
                 "─".repeat(snippet_area.width as usize),

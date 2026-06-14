@@ -3,6 +3,12 @@
 All notable changes to hexplorer are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.8] - 2026-06-14
+
+### Changed
+
+- HexDocs URLs now use per-package subdomains (`PKG.hexdocs.pm`) instead of the shared path form (`hexdocs.pm/PKG`). Package names with underscores map to hyphens in the subdomain, so `gleam_stdlib` resolves to `gleam-stdlib.hexdocs.pm`. A new `docs_base_url` helper builds the canonical URL and is used by the search-index fetch and both doc-link openers. Old path URLs still redirect, so this just skips the redirect hop. See <https://hex.pm/blog/hexdocs-per-package-subdomains> (closes #23).
+
 ## [0.1.7] — 2026-04-22
 
 ### Added
