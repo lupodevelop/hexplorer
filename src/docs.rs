@@ -148,9 +148,27 @@ fn decode_entity(entity: &str) -> Option<String> {
 /// **Step 2 — HTML discovery** (if all direct candidates fail):
 ///   Fetch `search.html`, scan `<script src="...">` for known asset paths,
 ///   fetch the discovered asset, or parse inline `searchData = {...}` from the page.
+/// Build the canonical HexDocs base URL for a package.
+///
+/// As of 2026-06-01 HexDocs serves each package from its own subdomain
+/// (`PKG.hexdocs.pm`) instead of a shared path (`hexdocs.pm/PKG`) to isolate
+/// packages under the browser same-origin policy. Underscores in package names
+/// are not valid in DNS labels, so they map to hyphens
+/// (`ecto_sql` → `ecto-sql.hexdocs.pm`). Old path URLs still redirect, but we
+/// emit the canonical form to avoid the redirect hop.
+///
+/// See <https://hex.pm/blog/hexdocs-per-package-subdomains>.
+///
+/// The returned string always ends with a trailing slash, so a relative
+/// `ref_url` can be appended directly.
+pub fn docs_base_url(package: &str) -> String {
+    let slug = package.replace('_', "-");
+    format!("https://{slug}.hexdocs.pm/")
+}
+
 pub async fn fetch_docs_search_data(package: &str) -> Result<Vec<SearchItem>> {
     let c = client()?;
-    let base = format!("https://hexdocs.pm/{package}/");
+    let base = docs_base_url(package);
     info!("[docs] fetch_docs_search_data package={package}");
 
     // ── Step 1: direct URL candidates ────────────────────────────────────────
@@ -455,6 +473,19 @@ mod tests {
     }
 
     // ── find_search_index_url ─────────────────────────────────────────────────
+
+    #[test]
+    fn docs_base_url_plain_package() {
+        assert_eq!(docs_base_url("lustre"), "https://lustre.hexdocs.pm/");
+    }
+
+    #[test]
+    fn docs_base_url_underscores_become_hyphens() {
+        assert_eq!(
+            docs_base_url("gleam_stdlib"),
+            "https://gleam-stdlib.hexdocs.pm/"
+        );
+    }
 
     #[test]
     fn find_url_from_script_src_json() {

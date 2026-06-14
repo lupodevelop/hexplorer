@@ -10,8 +10,8 @@ use std::collections::HashMap;
 
 use crate::{
     api::{
-        fetch_by_names, fetch_docs_search_data, fetch_github_stats, fetch_package, fetch_packages,
-        github_token, GhResult, Package, SearchItem,
+        docs_base_url, fetch_by_names, fetch_docs_search_data, fetch_github_stats, fetch_package,
+        fetch_packages, github_token, GhResult, Package, SearchItem,
     },
     cache::{self, CacheMap, CachedEntry},
     favorites,
@@ -828,10 +828,7 @@ impl App {
             }
             KeyCode::Enter => {
                 if let Some(item) = self.docs_search_results.get(self.docs_search_cursor) {
-                    let url = format!(
-                        "https://hexdocs.pm/{}/{}",
-                        self.docs_search_pkg, item.ref_url
-                    );
+                    let url = format!("{}{}", docs_base_url(&self.docs_search_pkg), item.ref_url);
                     let _ = open::that(url);
                 }
             }
