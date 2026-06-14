@@ -828,8 +828,7 @@ impl App {
             }
             KeyCode::Enter => {
                 if let Some(item) = self.docs_search_results.get(self.docs_search_cursor) {
-                    let url =
-                        format!("{}{}", docs_base_url(&self.docs_search_pkg), item.ref_url);
+                    let url = format!("{}{}", docs_base_url(&self.docs_search_pkg), item.ref_url);
                     let _ = open::that(url);
                 }
             }
